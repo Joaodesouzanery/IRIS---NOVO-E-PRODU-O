@@ -1,0 +1,143 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-base: #111111;
+    --bg-sidebar: #0a0a0a;
+    --bg-card: #1c1c1c;
+    --border: #2a2a2a;
+    --brand: #f97316;
+  }
+
+  * {
+    box-sizing: border-box;
+    border-color: #2a2a2a;
+  }
+
+  html {
+    background-color: #111111;
+    color: #ffffff;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: #111111;
+    color: #ffffff;
+    min-height: 100vh;
+  }
+
+  /* Scrollbar customizada */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #111111;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #3a3a3a;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #4a4a4a;
+  }
+}
+
+@layer components {
+  .section-label {
+    @apply text-label font-mono font-medium uppercase tracking-widest text-text-muted;
+  }
+
+  .card {
+    @apply bg-bg-card border border-border rounded-card p-4;
+  }
+
+  .card-hover {
+    @apply card transition-all duration-200 hover:border-brand/30 hover:shadow-card-hover;
+  }
+
+  .metric-value {
+    @apply font-mono text-3xl font-semibold text-text-primary;
+  }
+
+  .metric-label {
+    @apply section-label mt-1;
+  }
+
+  .sidebar-item {
+    @apply flex items-center gap-3 px-3 py-2 rounded-md text-sm text-text-secondary
+           transition-all duration-150 cursor-pointer select-none;
+  }
+
+  .sidebar-item:hover {
+    @apply bg-bg-hover text-text-primary;
+  }
+
+  .sidebar-item.active {
+    @apply bg-brand/10 text-brand font-medium;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-orange {
+    @apply badge bg-brand/15 text-brand;
+  }
+
+  .badge-green {
+    @apply badge bg-success/15 text-success;
+  }
+
+  .badge-red {
+    @apply badge bg-error/15 text-error;
+  }
+
+  .badge-gray {
+    @apply badge bg-bg-hover text-text-secondary;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
+           bg-brand text-white transition-colors duration-150
+           hover:bg-brand-hover focus:outline-none focus:ring-2 focus:ring-brand/50
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
+           bg-bg-card border border-border text-text-secondary
+           transition-colors duration-150 hover:text-text-primary hover:border-border
+           focus:outline-none focus:ring-2 focus:ring-brand/30;
+  }
+
+  .input {
+    @apply w-full bg-bg-input border border-border rounded-md px-3 py-2 text-sm
+           text-text-primary placeholder:text-text-label
+           focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand
+           transition-colors duration-150;
+  }
+
+  .select {
+    @apply input appearance-none cursor-pointer;
+  }
+
+  /* Gráficos Recharts customizados */
+  .recharts-cartesian-grid line {
+    stroke: #2a2a2a !important;
+  }
+  .recharts-text {
+    fill: #71717a !important;
+    font-size: 11px !important;
+    font-family: 'JetBrains Mono', monospace !important;
+  }
+  .recharts-tooltip-wrapper {
+    outline: none !important;
+  }
+}
