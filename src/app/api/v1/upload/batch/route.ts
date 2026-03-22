@@ -1,22 +1,39 @@
 /**
  * POST /api/v1/upload/batch
- * Substitui backend/app/api/v1/upload.py
  * Aceita múltiplos PDFs, valida via magic bytes, envia para Supabase Storage,
- * cria registros upload_jobs e enfileira tasks no Trigger.dev.
+ * cria registros upload_jobs e dispara o pipeline em background via waitUntil.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { isPdfBuffer, sha256Hex } from "@/lib/server/pdf-extractor";
-import { tasks } from "@trigger.dev/sdk/v3";
-import type { processPdfTask } from "@/trigger/process-pdf";
+import { waitUntil } from "@vercel/functions";
+import { demoData } from "@/lib/demo-data";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB por arquivo
 const MAX_FILES_PER_BATCH = 1000;
 
+function isDemo(req: NextRequest): boolean {
+  return (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    req.nextUrl.searchParams.get("demo") === "1"
+  );
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
+
+    // Modo demo: rejeita uploads mas retorna resposta amigável
+    if (isDemo(req)) {
+      const files = formData.getAll("files") as File[];
+      const filenames = files.map((f) => f.name);
+      return NextResponse.json(demoData.uploadDemo(filenames), { status: 200 });
+    }
+
+    // Importação dinâmica para evitar erro em build sem credenciais
+    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const { isPdfBuffer, sha256Hex } = await import("@/lib/server/pdf-extractor");
+    const { processPdf } = await import("@/lib/server/pipeline");
+
     const agenciaId = formData.get("agencia_id");
 
     if (!agenciaId || typeof agenciaId !== "string") {
@@ -64,6 +81,8 @@ export async function POST(req: NextRequest) {
       status: string;
       message?: string;
     }> = [];
+
+    const jobsToProcess: Array<{ jobId: string; agenciaId: string }> = [];
 
     for (const file of files) {
       // Validação de tamanho
@@ -152,17 +171,24 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // Enfileirar no Trigger.dev
-      await tasks.trigger<typeof processPdfTask>("process-pdf", {
-        jobId: job.id,
-        agenciaId,
-      });
+      jobsToProcess.push({ jobId: job.id, agenciaId });
 
       results.push({
         filename: file.name,
         job_id: job.id,
         status: "queued",
       });
+    }
+
+    // Dispara pipeline em background sem bloquear a resposta HTTP
+    if (jobsToProcess.length > 0) {
+      waitUntil(
+        Promise.all(
+          jobsToProcess.map(({ jobId, agenciaId: aid }) =>
+            processPdf(jobId, aid)
+          )
+        )
+      );
     }
 
     const queued = results.filter((r) => r.status === "queued").length;

@@ -4,9 +4,18 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { demoData } from "@/lib/demo-data";
+
+function isDemo(req: NextRequest): boolean {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
+}
 
 export async function GET(req: NextRequest) {
+  if (isDemo(req)) {
+    return NextResponse.json(demoData.diretores());
+  }
+
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
   const db = createSupabaseServerClient();
   const agenciaId = req.nextUrl.searchParams.get("agencia_id");
 

@@ -4,18 +4,24 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { demoData } from "@/lib/demo-data";
+
+function isDemo(req: NextRequest): boolean {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
+}
 
 export async function GET(req: NextRequest) {
+  if (isDemo(req)) {
+    return NextResponse.json(demoData.votacaoMatrix());
+  }
+
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
   const db = createSupabaseServerClient();
   const agenciaId = req.nextUrl.searchParams.get("agencia_id");
 
   let query = db
     .from("votos")
-    .select(
-      `tipo_voto, is_divergente,
-       diretores!inner (id, nome, agencia_id)`
-    );
+    .select(`tipo_voto, is_divergente, diretores!inner (id, nome, agencia_id)`);
 
   if (agenciaId) {
     query = query.eq("diretores.agencia_id", agenciaId);
@@ -29,28 +35,14 @@ export async function GET(req: NextRequest) {
 
   const matrix = new Map<
     string,
-    {
-      nome: string;
-      total: number;
-      favoravel: number;
-      desfavoravel: number;
-      abstencao: number;
-      divergente: number;
-    }
+    { nome: string; total: number; favoravel: number; desfavoravel: number; abstencao: number; divergente: number }
   >();
 
   for (const row of data ?? []) {
     const dir = (row as any).diretores;
     const id = dir.id;
     if (!matrix.has(id)) {
-      matrix.set(id, {
-        nome: dir.nome,
-        total: 0,
-        favoravel: 0,
-        desfavoravel: 0,
-        abstencao: 0,
-        divergente: 0,
-      });
+      matrix.set(id, { nome: dir.nome, total: 0, favoravel: 0, desfavoravel: 0, abstencao: 0, divergente: 0 });
     }
     const m = matrix.get(id)!;
     m.total++;

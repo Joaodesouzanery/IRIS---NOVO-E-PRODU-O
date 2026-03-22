@@ -4,11 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { MicrotemaStats, DiretorOverviewItem } from "@/types";
 import { IrisBarChart } from "@/components/charts/IrisBarChart";
-import { IrisAreaChart } from "@/components/charts/IrisAreaChart";
 import { GaugeChart } from "@/components/charts/GaugeChart";
-import { getMicrotemaLabel, getMicrotemaColor, formatNumber } from "@/lib/utils";
+import { getMicrotemaLabel, formatNumber } from "@/lib/utils";
 import Link from "next/link";
-import { BarChart3, Users, Building2, TrendingUp } from "lucide-react";
+import { BarChart3, Users, Building2 } from "lucide-react";
 
 export default function AnalyticsPage() {
   const { data: microtemas } = useQuery({
@@ -20,11 +19,6 @@ export default function AnalyticsPage() {
     queryKey: ["dashboard", "diretores-overview"],
     queryFn: () => api.get<DiretorOverviewItem[]>("/dashboard/diretores/overview"),
   });
-
-  const topMicrotema = (microtemas ?? []).reduce(
-    (max, m) => (m.total > (max?.total ?? 0) ? m : max),
-    null as MicrotemaStats | null
-  );
 
   const maisIndeferido = (microtemas ?? []).reduce(
     (max, m) => (m.pct_indeferido > (max?.pct_indeferido ?? 0) ? m : max),
@@ -65,7 +59,6 @@ export default function AnalyticsPage() {
       <section>
         <p className="section-label mb-4">Métricas por Tema</p>
 
-        {/* Cards destaque */}
         <div className="grid grid-cols-2 gap-4 mb-4">
           {maisIndeferido && (
             <div className="card border-error/30">
@@ -97,7 +90,6 @@ export default function AnalyticsPage() {
           )}
         </div>
 
-        {/* Ranking horizontal */}
         <div className="card">
           <p className="text-sm font-medium text-text-secondary mb-4">
             Ranking: Temas mais recorrentes
@@ -122,18 +114,18 @@ export default function AnalyticsPage() {
                 {d.diretor_nome}
               </p>
               <GaugeChart
-                value={d.taxa_deferimento}
-                label="Taxa Defirimento"
+                value={d.pct_favor}
+                label="Taxa Deferimento"
                 size={150}
               />
               <div className="mt-3 space-y-1">
                 <div className="flex justify-between text-xs">
                   <span className="text-text-muted">Total de votos</span>
-                  <span className="font-mono text-text-primary">{formatNumber(d.total_votos)}</span>
+                  <span className="font-mono text-text-primary">{formatNumber(d.total)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-text-muted">Favoráveis</span>
-                  <span className="font-mono text-success">{formatNumber(d.votos_favoraveis)}</span>
+                  <span className="font-mono text-success">{formatNumber(d.favoravel)}</span>
                 </div>
               </div>
             </div>

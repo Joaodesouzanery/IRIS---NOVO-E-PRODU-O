@@ -2,11 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { cn, formatDate, formatPercent } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import type { Mandato, Agencia } from "@/types";
-import { differenceInMonths, differenceInDays, parseISO } from "date-fns";
+import { differenceInMonths, parseISO } from "date-fns";
 import { useState } from "react";
-import { Users, Calendar, CheckCircle } from "lucide-react";
 
 function MandatoProgress({ mandato }: { mandato: Mandato }) {
   const now = new Date();
@@ -14,8 +13,8 @@ function MandatoProgress({ mandato }: { mandato: Mandato }) {
   const fim = mandato.data_fim ? parseISO(mandato.data_fim) : null;
 
   const mesesDecorridos = differenceInMonths(now, inicio);
-  const mesesTotais = fim ? differenceInMonths(fim, inicio) : 60; // 5 anos padrão
-  const pct = Math.min(100, Math.round((mesesDecorridos / mesesTotais) * 100));
+  const mesesTotais = fim ? differenceInMonths(fim, inicio) : 60;
+  const pct = Math.min(100, Math.max(0, Math.round((mesesDecorridos / mesesTotais) * 100)));
 
   const anos = Math.floor(mesesDecorridos / 12);
   const meses = mesesDecorridos % 12;
@@ -23,12 +22,12 @@ function MandatoProgress({ mandato }: { mandato: Mandato }) {
     ? `${anos}a ${meses > 0 ? meses + "m " : ""}decorridos`
     : `${meses}m decorridos`;
 
-  const initials = mandato.diretor?.nome
+  const initials = mandato.diretor_nome
     .split(" ")
     .filter((w) => w.length > 2)
     .slice(0, 2)
     .map((w) => w[0])
-    .join("") ?? "??";
+    .join("") || "??";
 
   return (
     <div className="card-hover p-5">
@@ -42,7 +41,7 @@ function MandatoProgress({ mandato }: { mandato: Mandato }) {
           {/* Nome e status */}
           <div className="flex items-center gap-2 mb-0.5">
             <h3 className="text-sm font-semibold text-text-primary truncate">
-              {mandato.diretor?.nome ?? "—"}
+              {mandato.diretor_nome}
             </h3>
             <span className={cn(
               "badge text-xs",
@@ -54,7 +53,7 @@ function MandatoProgress({ mandato }: { mandato: Mandato }) {
 
           {/* Cargo */}
           <p className="text-xs text-text-muted mb-3">
-            {mandato.diretor?.cargo ?? "Diretor"}
+            {mandato.cargo ?? "Diretor"}
           </p>
 
           {/* Datas */}
@@ -69,7 +68,7 @@ function MandatoProgress({ mandato }: { mandato: Mandato }) {
             </div>
           </div>
 
-          {/* Barra de progresso do mandato */}
+          {/* Barra de progresso */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-text-muted">{tempoLabel}</span>
@@ -107,7 +106,6 @@ export default function MandatosPage() {
   });
 
   const ativos = (mandatos ?? []).filter((m) => m.status === "Ativo").length;
-  const totalParticipacoes = 0; // TODO: calcular de votos
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -142,7 +140,7 @@ export default function MandatosPage() {
         </div>
       </div>
 
-      {/* KPIs de mandatos */}
+      {/* KPIs */}
       <div className="grid grid-cols-4 gap-4">
         <div className="card text-center">
           <p className="section-label mb-1">Diretores Ativos</p>
@@ -157,22 +155,16 @@ export default function MandatosPage() {
           <p className="metric-value">{agencias?.length ?? "—"}</p>
         </div>
         <div className="card text-center">
-          <p className="section-label mb-1">Status</p>
-          <p className="metric-value text-success">
-            {statusFilter || "Todos"}
-          </p>
+          <p className="section-label mb-1">Filtro</p>
+          <p className="metric-value text-success">{statusFilter || "Todos"}</p>
         </div>
       </div>
 
       {/* Cards de mandatos */}
       {isLoading ? (
-        <div className="text-center py-12 text-text-muted text-sm">
-          Carregando mandatos...
-        </div>
+        <div className="text-center py-12 text-text-muted text-sm">Carregando mandatos...</div>
       ) : (mandatos ?? []).length === 0 ? (
-        <div className="text-center py-12 text-text-muted text-sm">
-          Nenhum mandato encontrado
-        </div>
+        <div className="text-center py-12 text-text-muted text-sm">Nenhum mandato encontrado</div>
       ) : (
         <div className="grid grid-cols-2 gap-4">
           {(mandatos ?? []).map((m) => (

@@ -4,9 +4,18 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { demoData } from "@/lib/demo-data";
 
-export async function GET(_req: NextRequest) {
+function isDemo(req: NextRequest): boolean {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
+}
+
+export async function GET(req: NextRequest) {
+  if (isDemo(req)) {
+    return NextResponse.json(demoData.agencias());
+  }
+
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
   const db = createSupabaseServerClient();
   const { data, error } = await db
     .from("agencias")
@@ -21,6 +30,13 @@ export async function GET(_req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  if (isDemo(req)) {
+    return NextResponse.json(
+      { error: "Criação de agências não disponível em modo demo" },
+      { status: 403 }
+    );
+  }
+
   const body = await req.json();
 
   const sigla = body.sigla?.trim().toUpperCase();
@@ -34,6 +50,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Nome inválido (máx 200 caracteres)" }, { status: 400 });
   }
 
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
   const db = createSupabaseServerClient();
   const { data, error } = await db
     .from("agencias")

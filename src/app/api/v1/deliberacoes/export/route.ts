@@ -4,10 +4,54 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { demoData } from "@/lib/demo-data";
+
+function isDemo(req: NextRequest): boolean {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
+}
+
+const escape = (v: unknown) => {
+  if (v === null || v === undefined) return "";
+  const s = String(v);
+  return s.includes(",") || s.includes('"') || s.includes("\n")
+    ? `"${s.replace(/"/g, '""')}"`
+    : s;
+};
+
+const HEADERS = [
+  "Numero", "Reuniao", "Data", "Interessado", "Processo",
+  "Microtema", "Resultado", "Pauta Interna", "Confiança IA", "Criado Em",
+];
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
+
+  if (isDemo(req)) {
+    const all = demoData.deliberacoes({ limit: 5000 }).data;
+    const rows = all.map((r) =>
+      [
+        escape(r.numero_deliberacao),
+        escape(r.reuniao_ordinaria),
+        escape(r.data_reuniao),
+        escape(r.interessado),
+        escape(r.processo),
+        escape(r.microtema),
+        escape(r.resultado),
+        escape(r.pauta_interna ? "Sim" : "Não"),
+        escape(r.extraction_confidence != null ? `${(r.extraction_confidence * 100).toFixed(0)}%` : ""),
+        escape(r.created_at),
+      ].join(",")
+    );
+    const csv = [HEADERS.join(","), ...rows].join("\n");
+    return new Response(csv, {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="deliberacoes_demo_${new Date().toISOString().slice(0, 10)}.csv"`,
+      },
+    });
+  }
+
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
   const db = createSupabaseServerClient();
 
   let query = db.from("deliberacoes").select(
@@ -39,32 +83,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Erro ao exportar" }, { status: 500 });
   }
 
-  const rows = data ?? [];
-
-  // Cabeçalho CSV
-  const headers = [
-    "Numero",
-    "Reuniao",
-    "Data",
-    "Interessado",
-    "Processo",
-    "Microtema",
-    "Resultado",
-    "Pauta Interna",
-    "Confiança IA",
-    "Agência",
-    "Criado Em",
-  ];
-
-  const escape = (v: unknown) => {
-    if (v === null || v === undefined) return "";
-    const s = String(v);
-    return s.includes(",") || s.includes('"') || s.includes("\n")
-      ? `"${s.replace(/"/g, '""')}"`
-      : s;
-  };
-
-  const csvRows = rows.map((r: any) =>
+  const csvRows = (data ?? []).map((r: any) =>
     [
       escape(r.numero_deliberacao),
       escape(r.reuniao_ordinaria),
@@ -75,12 +94,11 @@ export async function GET(req: NextRequest) {
       escape(r.resultado),
       escape(r.pauta_interna ? "Sim" : "Não"),
       escape(r.extraction_confidence != null ? `${(r.extraction_confidence * 100).toFixed(0)}%` : ""),
-      escape(r.agencias?.sigla),
       escape(r.created_at),
     ].join(",")
   );
 
-  const csv = [headers.join(","), ...csvRows].join("\n");
+  const csv = [HEADERS.join(","), ...csvRows].join("\n");
 
   return new Response(csv, {
     headers: {

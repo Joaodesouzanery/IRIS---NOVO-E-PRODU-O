@@ -4,12 +4,20 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+function isDemo(req: NextRequest): boolean {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
+}
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { jobId: string } }
 ) {
+  if (isDemo(req)) {
+    return NextResponse.json({ error: "Job não encontrado" }, { status: 404 });
+  }
+
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
   const db = createSupabaseServerClient();
   const { data, error } = await db
     .from("upload_jobs")

@@ -4,18 +4,24 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { demoData } from "@/lib/demo-data";
+
+function isDemo(req: NextRequest): boolean {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
+}
 
 export async function GET(req: NextRequest) {
+  if (isDemo(req)) {
+    return NextResponse.json(demoData.votacaoFidelidade());
+  }
+
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
   const db = createSupabaseServerClient();
   const agenciaId = req.nextUrl.searchParams.get("agencia_id");
 
   let query = db
     .from("votos")
-    .select(
-      `is_divergente, is_nominal,
-       diretores!inner (id, nome, agencia_id)`
-    );
+    .select(`is_divergente, is_nominal, diretores!inner (id, nome, agencia_id)`);
 
   if (agenciaId) {
     query = query.eq("diretores.agencia_id", agenciaId);
@@ -27,10 +33,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Erro ao buscar fidelidade" }, { status: 500 });
   }
 
-  const stats = new Map<
-    string,
-    { nome: string; total: number; nominal: number; divergente: number }
-  >();
+  const stats = new Map<string, { nome: string; total: number; nominal: number; divergente: number }>();
 
   for (const row of data ?? []) {
     const dir = (row as any).diretores;

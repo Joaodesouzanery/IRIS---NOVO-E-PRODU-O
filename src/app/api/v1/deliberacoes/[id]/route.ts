@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { demoData } from "@/lib/demo-data";
 
 const ALLOWED_PATCH_FIELDS = new Set([
   "numero_deliberacao",
@@ -19,10 +19,23 @@ const ALLOWED_PATCH_FIELDS = new Set([
   "fundamento_decisao",
 ]);
 
+function isDemo(req: NextRequest): boolean {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
+}
+
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  if (isDemo(req)) {
+    const delib = demoData.deliberacaoById(params.id);
+    if (!delib) {
+      return NextResponse.json({ error: "Deliberação não encontrada" }, { status: 404 });
+    }
+    return NextResponse.json(delib);
+  }
+
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
   const db = createSupabaseServerClient();
   const { data, error } = await db
     .from("deliberacoes")
@@ -56,9 +69,15 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  if (isDemo(req)) {
+    return NextResponse.json(
+      { error: "Edição não disponível em modo demo" },
+      { status: 403 }
+    );
+  }
+
   const body = await req.json();
 
-  // Whitelist de campos editáveis
   const updates: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(body)) {
     if (ALLOWED_PATCH_FIELDS.has(key)) {
@@ -72,6 +91,7 @@ export async function PATCH(
 
   updates.updated_at = new Date().toISOString();
 
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
   const db = createSupabaseServerClient();
   const { data, error } = await db
     .from("deliberacoes")

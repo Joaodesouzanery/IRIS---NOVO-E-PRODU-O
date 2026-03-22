@@ -1,11 +1,10 @@
 /**
  * GET /api/v1/deliberacoes
  * Lista deliberações com filtros, paginação e full-text search.
- * Substitui backend/app/api/v1/deliberacoes.py
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { demoData } from "@/lib/demo-data";
 
 const VALID_SORT_COLUMNS = new Set([
   "data_reuniao",
@@ -16,20 +15,37 @@ const VALID_SORT_COLUMNS = new Set([
   "created_at",
 ]);
 
+function isDemo(req: NextRequest): boolean {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
+
+  if (isDemo(req)) {
+    return NextResponse.json(
+      demoData.deliberacoes({
+        page: parseInt(searchParams.get("page") ?? "1", 10),
+        limit: parseInt(searchParams.get("limit") ?? "20", 10),
+        microtema: searchParams.get("microtema") ?? undefined,
+        resultado: searchParams.get("resultado") ?? undefined,
+        search: searchParams.get("search") ?? undefined,
+      })
+    );
+  }
 
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") ?? "20", 10)));
   const offset = (page - 1) * limit;
 
   const sortBy = searchParams.get("sort_by") ?? "data_reuniao";
-  const sortOrder = searchParams.get("sort_order") === "asc" ? true : false; // false = descending
+  const sortOrder = searchParams.get("sort_order") === "asc";
 
   if (!VALID_SORT_COLUMNS.has(sortBy)) {
     return NextResponse.json({ error: "Coluna de ordenação inválida" }, { status: 400 });
   }
 
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
   const db = createSupabaseServerClient();
   let query = db
     .from("deliberacoes")
@@ -42,7 +58,6 @@ export async function GET(req: NextRequest) {
       { count: "exact" }
     );
 
-  // Filtros
   const agenciaId = searchParams.get("agencia_id");
   if (agenciaId) query = query.eq("agencia_id", agenciaId);
 
@@ -67,13 +82,11 @@ export async function GET(req: NextRequest) {
   const pautaInterna = searchParams.get("pauta_interna");
   if (pautaInterna !== null) query = query.eq("pauta_interna", pautaInterna === "true");
 
-  // Full-text search via pg_trgm (ilike funciona no Supabase sem extensão extra)
   const search = searchParams.get("search");
   if (search && search.trim().length >= 2) {
     query = query.ilike("raw_text", `%${search.trim()}%`);
   }
 
-  // Paginação e ordenação
   query = query
     .order(sortBy, { ascending: sortOrder })
     .range(offset, offset + limit - 1);
@@ -85,7 +98,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Erro ao buscar deliberações" }, { status: 500 });
   }
 
-  // Formatar votos com nome do diretor
   const formatted = (data ?? []).map((d: any) => ({
     ...d,
     votos: (d.votos ?? []).map((v: any) => ({

@@ -2,6 +2,11 @@
 // Sem CORS, sem NEXT_PUBLIC_API_URL necessário
 const BASE_URL = "/api";
 
+// Quando Supabase não está configurado, usa dados demo automaticamente
+const IS_DEMO =
+  typeof window !== "undefined" &&
+  !process.env.NEXT_PUBLIC_SUPABASE_URL;
+
 class ApiError extends Error {
   constructor(
     public status: number,
@@ -12,11 +17,20 @@ class ApiError extends Error {
   }
 }
 
+function buildUrl(path: string): string {
+  const url = new URL(`${BASE_URL}/v1${path}`, window.location.origin);
+  if (IS_DEMO && !url.searchParams.has("demo")) {
+    url.searchParams.set("demo", "1");
+  }
+  return url.pathname + url.search;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const res = await fetch(`${BASE_URL}/v1${path}`, {
+  const url = buildUrl(path);
+  const res = await fetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -49,7 +63,8 @@ export const api = {
 
   // Upload especial: multipart/form-data (sem Content-Type)
   upload: async <T>(path: string, formData: FormData): Promise<T> => {
-    const res = await fetch(`${BASE_URL}/v1${path}`, {
+    const url = buildUrl(path);
+    const res = await fetch(url, {
       method: "POST",
       body: formData,
       // Sem Content-Type — o browser define o boundary do multipart automaticamente

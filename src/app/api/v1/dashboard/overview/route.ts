@@ -4,9 +4,18 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { demoData } from "@/lib/demo-data";
+
+function isDemo(req: NextRequest): boolean {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
+}
 
 export async function GET(req: NextRequest) {
+  if (isDemo(req)) {
+    return NextResponse.json(demoData.overview());
+  }
+
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
   const db = createSupabaseServerClient();
   const agenciaId = req.nextUrl.searchParams.get("agencia_id");
 
@@ -33,10 +42,8 @@ export async function GET(req: NextRequest) {
         rows.filter((r) => r.extraction_confidence !== null).length
       : 0;
 
-  // Reuniões únicas (data)
   const reunioesUnicas = new Set(rows.map((r) => r.data_reuniao).filter(Boolean)).size;
 
-  // Microtema mais comum
   const microtemaCount = new Map<string, number>();
   for (const r of rows) {
     if (r.microtema) {

@@ -1,19 +1,43 @@
 /**
  * GET /api/v1/upload/jobs/[jobId]/stream
  * Server-Sent Events — status em tempo real do job de processamento.
- * Substitui o SSE do FastAPI Python.
  */
 
 import { NextRequest } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+function isDemo(req: NextRequest): boolean {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
+}
+
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { jobId: string } }
 ) {
   const { jobId } = params;
+
+  // Em modo demo, não há jobs reais
+  if (isDemo(req)) {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ error: "Job não encontrado", jobId })}\n\n`)
+        );
+        controller.close();
+      },
+    });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
+    });
+  }
+
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -27,8 +51,7 @@ export async function GET(
 
       const db = createSupabaseServerClient();
       const TERMINAL_STATUSES = ["done", "failed", "done_with_warnings"];
-      const POLL_INTERVAL = 2000; // 2 segundos
-
+      const POLL_INTERVAL = 2000;
       let attempts = 0;
       const MAX_ATTEMPTS = 150; // 5 minutos máximo
 
@@ -52,9 +75,7 @@ export async function GET(
           updated_at: job.updated_at,
         });
 
-        if (TERMINAL_STATUSES.includes(job.status)) {
-          break;
-        }
+        if (TERMINAL_STATUSES.includes(job.status)) break;
 
         await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
         attempts++;

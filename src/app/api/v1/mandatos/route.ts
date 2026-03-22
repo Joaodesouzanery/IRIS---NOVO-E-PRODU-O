@@ -4,11 +4,29 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { demoData } from "@/lib/demo-data";
+
+function isDemo(req: NextRequest): boolean {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
+}
 
 export async function GET(req: NextRequest) {
+  if (isDemo(req)) {
+    const all = demoData.mandatos();
+    const statusFilter = req.nextUrl.searchParams.get("status");
+    const agenciaId = req.nextUrl.searchParams.get("agencia_id");
+    const filtered = all.filter((m) => {
+      if (statusFilter && m.status !== statusFilter) return false;
+      if (agenciaId && m.agencia_id !== agenciaId) return false;
+      return true;
+    });
+    return NextResponse.json(filtered);
+  }
+
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
   const db = createSupabaseServerClient();
   const agenciaId = req.nextUrl.searchParams.get("agencia_id");
+  const statusFilter = req.nextUrl.searchParams.get("status");
 
   let query = db
     .from("mandatos")
@@ -28,16 +46,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Erro ao buscar mandatos" }, { status: 500 });
   }
 
-  const formatted = (data ?? []).map((m: any) => ({
-    id: m.id,
-    data_inicio: m.data_inicio,
-    data_fim: m.data_fim,
-    cargo: m.cargo,
-    diretor_id: m.diretores.id,
-    diretor_nome: m.diretores.nome,
-    diretor_ativo: m.diretores.ativo,
-    agencia_id: m.diretores.agencia_id,
-  }));
+  const now = new Date().toISOString().slice(0, 10);
+
+  const formatted = (data ?? []).map((m: any) => {
+    const status =
+      !m.data_fim || m.data_fim >= now ? "Ativo" : "Inativo";
+    return {
+      id: m.id,
+      data_inicio: m.data_inicio,
+      data_fim: m.data_fim,
+      cargo: m.cargo,
+      diretor_id: m.diretores.id,
+      diretor_nome: m.diretores.nome,
+      agencia_id: m.diretores.agencia_id,
+      status,
+    };
+  }).filter((m) => {
+    if (statusFilter && m.status !== statusFilter) return false;
+    return true;
+  });
 
   return NextResponse.json(formatted);
 }

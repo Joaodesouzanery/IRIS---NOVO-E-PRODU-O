@@ -7,8 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit",
-    "trigger:dev": "npx trigger.dev@latest dev"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "next": "14.2.20",
@@ -36,8 +35,7 @@
     "@supabase/supabase-js": "^2.47.10",
     "@supabase/ssr": "^0.5.2",
     "pdf-parse": "^1.1.1",
-    "@trigger.dev/sdk": "^3.3.17",
-    "@trigger.dev/nextjs": "^3.3.17"
+    "@vercel/functions": "^1.4.0"
   },
   "devDependencies": {
     "typescript": "^5.7.2",

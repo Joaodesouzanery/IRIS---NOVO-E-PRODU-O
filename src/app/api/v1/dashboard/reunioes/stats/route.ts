@@ -4,9 +4,18 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { demoData } from "@/lib/demo-data";
+
+function isDemo(req: NextRequest): boolean {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
+}
 
 export async function GET(req: NextRequest) {
+  if (isDemo(req)) {
+    return NextResponse.json(demoData.reunioesStats());
+  }
+
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
   const db = createSupabaseServerClient();
   const agenciaId = req.nextUrl.searchParams.get("agencia_id");
 
@@ -24,10 +33,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Erro ao buscar stats de reuniões" }, { status: 500 });
   }
 
-  const monthStats = new Map<
-    string,
-    { total: number; deferido: number; indeferido: number }
-  >();
+  const monthStats = new Map<string, { total: number; deferido: number; indeferido: number }>();
 
   for (const row of data ?? []) {
     const d = new Date(row.data_reuniao!);

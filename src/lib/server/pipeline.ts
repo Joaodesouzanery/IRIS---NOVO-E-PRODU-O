@@ -1,0 +1,128 @@
+/**
+ * Pipeline de processamento de PDF.
+ * Substitui o Trigger.dev worker — chamado via waitUntil() do @vercel/functions
+ * diretamente da API Route de upload, sem serviço externo.
+ */
+
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { extractPdfText } from "@/lib/server/pdf-extractor";
+import { extractFields, calcConfidence } from "@/lib/server/nlp-extractor";
+import { classifyMicrotema } from "@/lib/server/classifier";
+import { findBestMatch } from "@/lib/server/name-matcher";
+
+export async function processPdf(jobId: string, agenciaId: string): Promise<void> {
+  const db = createSupabaseServerClient();
+
+  // Marca como processing
+  await db
+    .from("upload_jobs")
+    .update({ status: "processing", updated_at: new Date().toISOString() })
+    .eq("id", jobId);
+
+  try {
+    // Busca o job para obter o storage_path
+    const { data: job } = await db
+      .from("upload_jobs")
+      .select("storage_path, filename")
+      .eq("id", jobId)
+      .single();
+
+    if (!job) throw new Error("Job não encontrado");
+
+    // Download do PDF do Supabase Storage
+    const { data: fileData, error: downloadErr } = await db.storage
+      .from("pdfs")
+      .download(job.storage_path);
+
+    if (downloadErr || !fileData) throw new Error(`Download falhou: ${downloadErr?.message}`);
+
+    const buffer = Buffer.from(await fileData.arrayBuffer());
+
+    // Extração de texto
+    const extraction = await extractPdfText(buffer);
+    if (!extraction.text || extraction.text.length < 50) {
+      throw new Error("PDF sem texto extraível (possível imagem)");
+    }
+
+    // NLP: extração de campos
+    const fields = extractFields(extraction.text);
+    const confidence = calcConfidence(fields);
+
+    // Classificação de microtema
+    const { microtema } = classifyMicrotema(extraction.text);
+
+    // Busca diretores da agência para matching de nomes
+    const { data: diretores } = await db
+      .from("diretores")
+      .select("id, nome")
+      .eq("agencia_id", agenciaId);
+
+    const diretoresList = (diretores ?? []).map((d) => ({ id: d.id, nome: d.nome }));
+
+    // Insere deliberação
+    const { data: delib, error: deliberacaoErr } = await db
+      .from("deliberacoes")
+      .insert({
+        numero_deliberacao: fields.numero_deliberacao ?? null,
+        reuniao_ordinaria: fields.reuniao_ordinaria ?? null,
+        processo: fields.processo ?? null,
+        interessado: fields.interessado ?? null,
+        microtema: microtema ?? null,
+        resultado: fields.resultado ?? null,
+        pauta_interna: fields.pauta_interna ?? false,
+        data_reuniao: fields.data_reuniao ?? null,
+        agencia_id: agenciaId,
+        auto_classified: true,
+        extraction_confidence: confidence,
+        resumo_pleito: fields.resumo_pleito ?? null,
+        fundamento_decisao: fields.fundamento_decisao ?? null,
+        raw_text: extraction.text.slice(0, 50000), // limite de storage
+        upload_job_id: jobId,
+      })
+      .select("id")
+      .single();
+
+    if (deliberacaoErr || !delib) {
+      throw new Error(`Erro ao inserir deliberação: ${deliberacaoErr?.message}`);
+    }
+
+    // Insere votos se houver nomes extraídos
+    if (fields.votantes && fields.votantes.length > 0) {
+      const votoRows = fields.votantes
+        .map((nome: string) => {
+          const match = findBestMatch(nome, diretoresList);
+          return {
+            deliberacao_id: delib.id,
+            diretor_id: match?.id ?? null,
+            tipo_voto: "Favoravel" as const,
+            is_divergente: false,
+            is_nominal: true,
+          };
+        })
+        .filter((v) => v.diretor_id !== null);
+
+      if (votoRows.length > 0) {
+        await db.from("votos").insert(votoRows);
+      }
+    }
+
+    // Marca como done
+    await db
+      .from("upload_jobs")
+      .update({ status: "done", updated_at: new Date().toISOString() })
+      .eq("id", jobId);
+
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[pipeline] Job ${jobId} falhou:`, message);
+
+    await db
+      .from("upload_jobs")
+      .update({
+        status: "failed",
+        error_message: message.slice(0, 500),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", jobId);
+  }
+}

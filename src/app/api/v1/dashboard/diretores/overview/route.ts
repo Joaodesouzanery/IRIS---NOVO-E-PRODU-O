@@ -4,9 +4,18 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { demoData } from "@/lib/demo-data";
+
+function isDemo(req: NextRequest): boolean {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
+}
 
 export async function GET(req: NextRequest) {
+  if (isDemo(req)) {
+    return NextResponse.json(demoData.diretoresOverview());
+  }
+
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
   const db = createSupabaseServerClient();
   const agenciaId = req.nextUrl.searchParams.get("agencia_id");
 
@@ -28,16 +37,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Erro ao buscar overview de diretores" }, { status: 500 });
   }
 
-  // Agrupa por diretor
   const stats = new Map<
     string,
-    {
-      nome: string;
-      total: number;
-      favoravel: number;
-      desfavoravel: number;
-      divergente: number;
-    }
+    { nome: string; total: number; favoravel: number; desfavoravel: number; divergente: number }
   >();
 
   for (const row of data ?? []) {
@@ -61,7 +63,7 @@ export async function GET(req: NextRequest) {
       favoravel: s.favoravel,
       desfavoravel: s.desfavoravel,
       divergente: s.divergente,
-      pct_favor: s.total > 0 ? ((s.favoravel / s.total) * 100).toFixed(1) : "0",
+      pct_favor: s.total > 0 ? parseFloat(((s.favoravel / s.total) * 100).toFixed(1)) : 0,
     }))
     .sort((a, b) => b.total - a.total);
 

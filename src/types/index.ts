@@ -33,12 +33,13 @@ export interface Diretor {
 export interface Mandato {
   id: string;
   diretor_id: string;
-  diretor_nome?: string;
+  diretor_nome: string;
   agencia_id?: string;
   data_inicio: string;
   data_fim: string | null;
   cargo: string | null;
-  created_at: string;
+  status: "Ativo" | "Inativo";
+  created_at?: string;
 }
 
 export interface VotoEmbutido {
@@ -157,5 +158,5 @@ export interface DiretorOverviewItem {
   favoravel: number;
   desfavoravel: number;
   divergente: number;
-  pct_favor: string;
+  pct_favor: number;
 }

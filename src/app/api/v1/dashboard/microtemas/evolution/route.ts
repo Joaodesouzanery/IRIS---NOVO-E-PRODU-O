@@ -4,9 +4,18 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { demoData } from "@/lib/demo-data";
+
+function isDemo(req: NextRequest): boolean {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
+}
 
 export async function GET(req: NextRequest) {
+  if (isDemo(req)) {
+    return NextResponse.json(demoData.microtemasEvolution());
+  }
+
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
   const db = createSupabaseServerClient();
   const agenciaId = req.nextUrl.searchParams.get("agencia_id");
 
@@ -25,13 +34,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Erro ao buscar evolução" }, { status: 500 });
   }
 
-  // Agrupa por mês-ano e microtema
   const groups = new Map<string, Map<string, number>>();
 
   for (const row of data ?? []) {
     const date = new Date(row.data_reuniao!);
     const period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-
     if (!groups.has(period)) groups.set(period, new Map());
     const periodMap = groups.get(period)!;
     periodMap.set(row.microtema!, (periodMap.get(row.microtema!) ?? 0) + 1);
