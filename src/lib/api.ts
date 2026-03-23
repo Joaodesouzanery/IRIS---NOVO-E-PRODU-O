@@ -18,11 +18,9 @@ class ApiError extends Error {
 }
 
 function buildUrl(path: string): string {
-  const url = new URL(`${BASE_URL}/v1${path}`, window.location.origin);
-  if (IS_DEMO && !url.searchParams.has("demo")) {
-    url.searchParams.set("demo", "1");
-  }
-  return url.pathname + url.search;
+  if (!IS_DEMO) return `${BASE_URL}/v1${path}`;
+  const sep = path.includes("?") ? "&" : "?";
+  return `${BASE_URL}/v1${path}${sep}demo=1`;
 }
 
 async function request<T>(

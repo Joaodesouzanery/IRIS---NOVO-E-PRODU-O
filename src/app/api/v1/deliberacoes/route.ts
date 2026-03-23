@@ -27,9 +27,11 @@ export async function GET(req: NextRequest) {
       demoData.deliberacoes({
         page: parseInt(searchParams.get("page") ?? "1", 10),
         limit: parseInt(searchParams.get("limit") ?? "20", 10),
+        agencia_id: searchParams.get("agencia_id") ?? undefined,
         microtema: searchParams.get("microtema") ?? undefined,
         resultado: searchParams.get("resultado") ?? undefined,
         search: searchParams.get("search") ?? undefined,
+        year: searchParams.get("year") ?? undefined,
       })
     );
   }
