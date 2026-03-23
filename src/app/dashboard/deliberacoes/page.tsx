@@ -22,6 +22,8 @@ export default function DeliberacoesPage() {
   const [microtema, setMicrotema] = useState<string>("");
   const [resultado, setResultado] = useState<string>("");
   const [pautaExterna, setPautaExterna] = useState(false);
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
   const [page, setPage] = useState(1);
 
   const params = new URLSearchParams();
@@ -31,6 +33,8 @@ export default function DeliberacoesPage() {
   if (microtema) params.set("microtema", microtema);
   if (resultado) params.set("resultado", resultado);
   if (pautaExterna) params.set("pauta_interna", "false");
+  if (dateFrom) params.set("date_from", dateFrom);
+  if (dateTo) params.set("date_to", dateTo);
   params.set("page", String(page));
   params.set("limit", "50");
 
@@ -132,6 +136,36 @@ export default function DeliberacoesPage() {
             <option value="Deferido">Deferido</option>
             <option value="Indeferido">Indeferido</option>
           </select>
+        </div>
+
+        {/* Filtros de data */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs text-text-label font-mono uppercase tracking-wider">Período:</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              className="input w-36 text-xs font-mono"
+              value={dateFrom}
+              onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+              placeholder="De"
+            />
+            <span className="text-text-muted text-xs">até</span>
+            <input
+              type="date"
+              className="input w-36 text-xs font-mono"
+              value={dateTo}
+              onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+              placeholder="Até"
+            />
+            {(dateFrom || dateTo) && (
+              <button
+                className="text-xs text-text-muted hover:text-brand transition-colors"
+                onClick={() => { setDateFrom(""); setDateTo(""); setPage(1); }}
+              >
+                Limpar
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Pauta externa toggle */}

@@ -11,15 +11,18 @@ function isDemo(req: NextRequest): boolean {
 }
 
 export async function GET(req: NextRequest) {
+  const agenciaId = req.nextUrl.searchParams.get("agencia_id") || null;
+
   if (isDemo(req)) {
-    return NextResponse.json(demoData.overview());
+    return NextResponse.json(demoData.overview(agenciaId));
   }
 
   const { createSupabaseServerClient } = await import("@/lib/supabase/server");
   const db = createSupabaseServerClient();
-  const agenciaId = req.nextUrl.searchParams.get("agencia_id");
 
-  let baseFilter = db.from("deliberacoes").select("id, resultado, microtema, data_reuniao, extraction_confidence");
+  let baseFilter = db
+    .from("deliberacoes")
+    .select("id, resultado, microtema, data_reuniao, extraction_confidence, auto_classified, pauta_interna");
   if (agenciaId) baseFilter = baseFilter.eq("agencia_id", agenciaId);
 
   const { data: deliberacoes, error } = await baseFilter;
@@ -55,6 +58,11 @@ export async function GET(req: NextRequest) {
       ? [...microtemaCount.entries()].sort((a, b) => b[1] - a[1])[0][0]
       : null;
 
+  const autoClassified = rows.filter((r) => r.auto_classified).length;
+  const auto_classified_pct = total > 0 ? Math.round((autoClassified / total) * 100) : 0;
+  const pauta_interna_count = rows.filter((r) => r.pauta_interna).length;
+  const pauta_externa = total - pauta_interna_count;
+
   return NextResponse.json({
     total_deliberacoes: total,
     deferidos,
@@ -64,5 +72,8 @@ export async function GET(req: NextRequest) {
     reunioes_unicas: reunioesUnicas,
     avg_confidence: avgConfidence,
     top_microtema: topMicrotema,
+    auto_classified_pct,
+    pauta_externa,
+    pauta_interna_count,
   });
 }

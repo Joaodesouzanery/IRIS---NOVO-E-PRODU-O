@@ -91,11 +91,12 @@ export async function processPdf(jobId: string, agenciaId: string): Promise<void
       const votoRows = fields.nomes_votacao
         .map((nome: string) => {
           const match = findBestMatch(nome, diretoresList);
+          const isContra = fields.nomes_votacao_contra.includes(nome);
           return {
             deliberacao_id: delib.id as string,
             diretor_id: match?.diretorId ?? null,
-            tipo_voto: "Favoravel" as const,
-            is_divergente: false,
+            tipo_voto: isContra ? ("Desfavoravel" as const) : ("Favoravel" as const),
+            is_divergente: isContra,
             is_nominal: true,
           };
         })

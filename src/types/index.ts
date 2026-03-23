@@ -130,6 +130,9 @@ export interface DashboardOverview {
   reunioes_unicas: number;
   avg_confidence: number;
   top_microtema: string | null;
+  auto_classified_pct: number;
+  pauta_externa: number;
+  pauta_interna_count: number;
 }
 
 export interface MicrotemaStats {
@@ -142,6 +145,18 @@ export interface MicrotemaStats {
 }
 
 // ─── Votação ─────────────────────────────────────────────────────────────
+
+export interface MandatosStats {
+  diretores_ativos: number;
+  participacoes_colegiadas: number;
+  taxa_consenso: string;
+  total_deliberacoes: number;
+}
+
+export interface VotoSector {
+  microtema: string;
+  count: number;
+}
 
 export interface VotoMatrixRow {
   diretor_id: string;

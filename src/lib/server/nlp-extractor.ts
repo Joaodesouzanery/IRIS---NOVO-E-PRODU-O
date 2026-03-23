@@ -39,6 +39,13 @@ const RE_VOTO_CONTEXTO = [
   /\b((?:[A-ZÁÉÍÓÚÂÊÔÃÕÇÀÜ][a-záéíóúâêôãõçàü]+\s+){1,4})(?:–|-)\s*(?:Favorável|Contrári[ao]|Favoravel|Abstenção|Ausente)/gi,
 ];
 
+// Pattern D extendido: captura nome E direção do voto para split favor/contra
+const RE_VOTO_DIRECAO =
+  /\b((?:[A-ZÁÉÍÓÚÂÊÔÃÕÇÀÜ][a-záéíóúâêôãõçàü]+\s+){1,4})(?:–|-)\s*(Favor[aá]vel|Contr[aá]ri[ao]|Absten[çc][aã]o|Ausente)/gi;
+
+// Número ordinal da reunião — apenas o dígito "1176"
+const RE_NUMERO_REUNIAO = /(\d{3,4})[ªa°º]?\s*Reuni[aã]o/gi;
+
 // Padrão D: bloco de assinatura ARTESP — "Nome Completo\nDiretor-Presidente"
 // Captura o nome que aparece imediatamente acima do cargo no rodapé do documento.
 const RE_ASSINATURA = /^([A-ZÁÉÍÓÚÂÊÔÃÕÇÀÜ][a-záéíóúâêôãõçàü][a-záéíóúâêôãõçàü\s]+)\s*\n\s*(?:Diretor(?:-Presidente)?|Diretora(?:-Presidente)?|Conselheiro(?:-Presidente)?|Conselheira|Presidente)/gm;
@@ -104,6 +111,7 @@ function normalizeResultado(raw: string): string | null {
 export interface ExtractedFields {
   numero_deliberacao: string | null;
   reuniao_ordinaria: string | null;
+  numero_reuniao: string | null;    // apenas o número ordinal "1176"
   data_reuniao: string | null;      // ISO: "YYYY-MM-DD"
   interessado: string | null;
   processo: string | null;
@@ -112,7 +120,9 @@ export interface ExtractedFields {
   pauta_interna: boolean;
   resumo_pleito: string | null;
   fundamento_decisao: string | null;
-  nomes_votacao: string[];          // nomes brutos para o name-matcher
+  nomes_votacao: string[];          // todos os nomes (compatibilidade)
+  nomes_votacao_favor: string[];    // nomes que votaram a favor
+  nomes_votacao_contra: string[];   // nomes que votaram contra/abstenção
 }
 
 // ─── Extração principal ───────────────────────────────────────────────────
@@ -165,10 +175,31 @@ export function extractFields(text: string): ExtractedFields {
   const RE_FUNDAMENTO = /(?:Fundamento[:\s]+|Em face do exposto|DECIDE[:\s]+|Decide-se[:\s]+)([\s\S]{20,1000}?)(?=\n\n|\n[A-Z]{3}|$)/i;
   const fundamento_decisao = RE_FUNDAMENTO.exec(text)?.[1]?.trim() ?? null;
 
+  // Número da reunião (apenas o ordinal)
+  const numero_reuniao = firstMatch(text, RE_NUMERO_REUNIAO);
+
   // ─── Nomes de diretores: contexto + bloco de assinatura ─────────────────
   const nomes_votacao: string[] = [];
+  const nomes_votacao_favor: string[] = [];
+  const nomes_votacao_contra: string[] = [];
 
-  // Padrões A / B / C (frases narrativas)
+  // Pattern com direção explícita: "Nome – Favorável/Contrário/Abstenção"
+  RE_VOTO_DIRECAO.lastIndex = 0;
+  let vd: RegExpExecArray | null;
+  while ((vd = RE_VOTO_DIRECAO.exec(text)) !== null) {
+    const nome = vd[1].trim();
+    const tipo = vd[2].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (nome.length > 4) {
+      if (!nomes_votacao.includes(nome)) nomes_votacao.push(nome);
+      if (tipo.startsWith("favor") && !nomes_votacao_favor.includes(nome)) {
+        nomes_votacao_favor.push(nome);
+      } else if (!tipo.startsWith("favor") && !nomes_votacao_contra.includes(nome)) {
+        nomes_votacao_contra.push(nome);
+      }
+    }
+  }
+
+  // Padrões A / B / C (frases narrativas — apenas nomes sem direção)
   for (const pattern of RE_VOTO_CONTEXTO) {
     pattern.lastIndex = 0;
     let m: RegExpExecArray | null;
@@ -178,7 +209,7 @@ export function extractFields(text: string): ExtractedFields {
     }
   }
 
-  // Padrão D (bloco de assinatura — padrão ARTESP/SEI)
+  // Padrão E (bloco de assinatura — padrão ARTESP/SEI)
   RE_ASSINATURA.lastIndex = 0;
   let sig: RegExpExecArray | null;
   while ((sig = RE_ASSINATURA.exec(text)) !== null) {
@@ -186,9 +217,15 @@ export function extractFields(text: string): ExtractedFields {
     if (nome.length > 4 && !nomes_votacao.includes(nome)) nomes_votacao.push(nome);
   }
 
+  // Fallback: sem direção explícita → todos considerados a favor (deliberações unânimes)
+  if (nomes_votacao_favor.length === 0 && nomes_votacao.length > 0) {
+    nomes_votacao_favor.push(...nomes_votacao);
+  }
+
   return {
     numero_deliberacao,
     reuniao_ordinaria,
+    numero_reuniao,
     data_reuniao,
     interessado,
     processo,
@@ -198,6 +235,8 @@ export function extractFields(text: string): ExtractedFields {
     resumo_pleito,
     fundamento_decisao,
     nomes_votacao,
+    nomes_votacao_favor,
+    nomes_votacao_contra,
   };
 }
 

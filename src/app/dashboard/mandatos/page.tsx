@@ -3,11 +3,21 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { cn, formatDate } from "@/lib/utils";
-import type { Mandato, Agencia } from "@/types";
+import type { Mandato, Agencia, MandatosStats, VotoMatrixRow, VotoDistribution, VotoSector } from "@/types";
 import { differenceInMonths, parseISO } from "date-fns";
 import { useState } from "react";
+import { IrisPieChart } from "@/components/charts/IrisPieChart";
+import { IrisBarChart } from "@/components/charts/IrisBarChart";
 
-function MandatoProgress({ mandato }: { mandato: Mandato }) {
+// ─── Director Card ────────────────────────────────────────────────────────────
+
+function DirectorCard({
+  mandato,
+  participacoes,
+}: {
+  mandato: Mandato;
+  participacoes: number;
+}) {
   const now = new Date();
   const inicio = parseISO(mandato.data_inicio);
   const fim = mandato.data_fim ? parseISO(mandato.data_fim) : null;
@@ -39,7 +49,7 @@ function MandatoProgress({ mandato }: { mandato: Mandato }) {
 
         <div className="flex-1 min-w-0">
           {/* Nome e status */}
-          <div className="flex items-center gap-2 mb-0.5">
+          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
             <h3 className="text-sm font-semibold text-text-primary truncate">
               {mandato.diretor_nome}
             </h3>
@@ -52,9 +62,7 @@ function MandatoProgress({ mandato }: { mandato: Mandato }) {
           </div>
 
           {/* Cargo */}
-          <p className="text-xs text-text-muted mb-3">
-            {mandato.cargo ?? "Diretor"}
-          </p>
+          <p className="text-xs text-text-muted mb-3">{mandato.cargo ?? "Diretor"}</p>
 
           {/* Datas */}
           <div className="grid grid-cols-2 gap-3 text-xs mb-3">
@@ -69,10 +77,10 @@ function MandatoProgress({ mandato }: { mandato: Mandato }) {
           </div>
 
           {/* Barra de progresso */}
-          <div>
+          <div className="mb-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-text-muted">{tempoLabel}</span>
-              <span className="text-xs font-mono text-brand">{pct}% do mandato</span>
+              <span className="text-xs font-mono text-brand">{pct}%</span>
             </div>
             <div className="w-full bg-bg-hover rounded-full h-1.5">
               <div
@@ -81,31 +89,116 @@ function MandatoProgress({ mandato }: { mandato: Mandato }) {
               />
             </div>
           </div>
+
+          {/* Participações */}
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-sm font-semibold text-brand">{participacoes}</span>
+            <span className="text-xs text-text-muted">participações colegiadas</span>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
+// ─── Voting Matrix Table ──────────────────────────────────────────────────────
+
+function VotacaoMatrix({ rows }: { rows: VotoMatrixRow[] }) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs font-mono">
+        <thead>
+          <tr className="border-b border-border">
+            <th className="text-left py-2 pr-4 text-text-label font-normal uppercase tracking-wider">Diretor</th>
+            <th className="text-right py-2 px-3 text-text-label font-normal uppercase tracking-wider">Favorável</th>
+            <th className="text-right py-2 px-3 text-text-label font-normal uppercase tracking-wider">Desfav.</th>
+            <th className="text-right py-2 px-3 text-text-label font-normal uppercase tracking-wider">Abstenção</th>
+            <th className="text-right py-2 px-3 text-text-label font-normal uppercase tracking-wider">Divergente</th>
+            <th className="text-right py-2 pl-3 text-text-label font-normal uppercase tracking-wider">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.diretor_id} className="border-b border-border/40 hover:bg-bg-hover/50 transition-colors">
+              <td className="py-2.5 pr-4 text-text-primary font-sans text-xs">{row.diretor_nome}</td>
+              <td className="text-right py-2.5 px-3 text-success">{row.favoravel}</td>
+              <td className="text-right py-2.5 px-3 text-danger">{row.desfavoravel}</td>
+              <td className="text-right py-2.5 px-3 text-text-muted">{row.abstencao}</td>
+              <td className="text-right py-2.5 px-3 text-brand">{row.divergente}</td>
+              <td className="text-right py-2.5 pl-3 text-text-secondary font-semibold">{row.total}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function MandatosPage() {
   const [agenciaId, setAgenciaId] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<string>("Ativo");
 
-  const params = new URLSearchParams();
-  if (agenciaId) params.set("agencia_id", agenciaId);
-  if (statusFilter) params.set("status", statusFilter);
-
-  const { data: mandatos, isLoading } = useQuery({
-    queryKey: ["mandatos", params.toString()],
-    queryFn: () => api.get<Mandato[]>(`/mandatos?${params.toString()}`),
-  });
+  const agenciaParam = agenciaId ? `?agencia_id=${agenciaId}` : "";
 
   const { data: agencias } = useQuery({
     queryKey: ["agencias"],
     queryFn: () => api.get<Agencia[]>("/agencias"),
   });
 
-  const ativos = (mandatos ?? []).filter((m) => m.status === "Ativo").length;
+  const { data: mandatos, isLoading } = useQuery({
+    queryKey: ["mandatos", agenciaId],
+    queryFn: () => api.get<Mandato[]>(`/mandatos?status=Ativo${agenciaId ? `&agencia_id=${agenciaId}` : ""}`),
+  });
+
+  const { data: stats } = useQuery({
+    queryKey: ["mandatos-stats", agenciaId],
+    queryFn: () => api.get<MandatosStats>(`/mandatos/stats${agenciaParam}`),
+  });
+
+  const { data: matrix } = useQuery({
+    queryKey: ["votacao-matrix", agenciaId],
+    queryFn: () => api.get<VotoMatrixRow[]>(`/votacao/matrix${agenciaParam}`),
+  });
+
+  const { data: distribution } = useQuery({
+    queryKey: ["votacao-distribution", agenciaId],
+    queryFn: () => api.get<VotoDistribution[]>(`/votacao/distribution${agenciaParam}`),
+  });
+
+  const { data: sectors } = useQuery({
+    queryKey: ["votacao-sectors", agenciaId],
+    queryFn: () => api.get<VotoSector[]>(`/votacao/sectors${agenciaParam}`),
+  });
+
+  // Map diretor_id → total participações from matrix
+  const participacoesMap = new Map<string, number>();
+  for (const row of matrix ?? []) {
+    participacoesMap.set(row.diretor_id, row.total);
+  }
+
+  // Pie data
+  const votoLabels: Record<string, string> = {
+    Favoravel: "Favorável",
+    Desfavoravel: "Desfavorável",
+    Abstencao: "Abstenção",
+    Ausente: "Ausente",
+  };
+  const votoColors: Record<string, string> = {
+    Favoravel: "#22c55e",
+    Desfavoravel: "#ef4444",
+    Abstencao: "#f59e0b",
+    Ausente: "#71717a",
+  };
+  const pieData = (distribution ?? []).map((d) => ({
+    name: votoLabels[d.tipo_voto] ?? d.tipo_voto,
+    value: d.count,
+    color: votoColors[d.tipo_voto],
+  }));
+
+  // Sectors bar data
+  const sectorsData = (sectors ?? []).map((s) => ({ name: s.microtema, value: s.count }));
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -114,62 +207,95 @@ export default function MandatosPage() {
         <div>
           <h1 className="text-xl font-semibold text-text-primary">Mandatos</h1>
           <p className="text-sm text-text-muted mt-1">
-            Acompanhamento de mandatos dos diretores por agência
+            Diretores, participações colegiadas e votações
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <select
-            className="select w-40"
-            value={agenciaId}
-            onChange={(e) => setAgenciaId(e.target.value)}
-          >
-            <option value="">Todas as agências</option>
-            {(agencias ?? []).map((a) => (
-              <option key={a.id} value={a.id}>{a.sigla}</option>
-            ))}
-          </select>
-          <select
-            className="select w-32"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">Todos</option>
-            <option value="Ativo">Ativos</option>
-            <option value="Inativo">Inativos</option>
-          </select>
-        </div>
+        <select
+          className="select w-44"
+          value={agenciaId}
+          onChange={(e) => setAgenciaId(e.target.value)}
+        >
+          <option value="">Todas as agências</option>
+          {(agencias ?? []).map((a) => (
+            <option key={a.id} value={a.id}>{a.sigla}</option>
+          ))}
+        </select>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="card text-center">
           <p className="section-label mb-1">Diretores Ativos</p>
-          <p className="metric-value text-brand">{ativos}</p>
+          <p className="metric-value text-brand">{stats?.diretores_ativos ?? "—"}</p>
         </div>
         <div className="card text-center">
-          <p className="section-label mb-1">Total de Mandatos</p>
-          <p className="metric-value">{mandatos?.length ?? "—"}</p>
+          <p className="section-label mb-1">Participações Coleg.</p>
+          <p className="metric-value">{stats?.participacoes_colegiadas ?? "—"}</p>
         </div>
         <div className="card text-center">
-          <p className="section-label mb-1">Agências</p>
-          <p className="metric-value">{agencias?.length ?? "—"}</p>
+          <p className="section-label mb-1">Taxa de Consenso</p>
+          <p className="metric-value text-success">{stats?.taxa_consenso ?? "—"}</p>
         </div>
         <div className="card text-center">
-          <p className="section-label mb-1">Filtro</p>
-          <p className="metric-value text-success">{statusFilter || "Todos"}</p>
+          <p className="section-label mb-1">Deliberações</p>
+          <p className="metric-value">{stats?.total_deliberacoes ?? "—"}</p>
         </div>
       </div>
 
-      {/* Cards de mandatos */}
+      {/* Director Cards */}
       {isLoading ? (
-        <div className="text-center py-12 text-text-muted text-sm">Carregando mandatos...</div>
+        <div className="text-center py-12 text-text-muted text-sm">Carregando diretores...</div>
       ) : (mandatos ?? []).length === 0 ? (
-        <div className="text-center py-12 text-text-muted text-sm">Nenhum mandato encontrado</div>
+        <div className="text-center py-12 text-text-muted text-sm">Nenhum mandato ativo encontrado</div>
       ) : (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {(mandatos ?? []).map((m) => (
-            <MandatoProgress key={m.id} mandato={m} />
+            <DirectorCard
+              key={m.id}
+              mandato={m}
+              participacoes={participacoesMap.get(m.diretor_id ?? "") ?? 0}
+            />
           ))}
+        </div>
+      )}
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Distribuição de votos */}
+        <div className="card">
+          <h2 className="section-label mb-4">Distribuição de Votos</h2>
+          {pieData.length > 0 ? (
+            <IrisPieChart data={pieData} height={220} innerRadius={55} />
+          ) : (
+            <div className="h-[220px] flex items-center justify-center text-text-muted text-sm">
+              Sem dados
+            </div>
+          )}
+        </div>
+
+        {/* Votos por setor */}
+        <div className="card">
+          <h2 className="section-label mb-4">Votos por Setor</h2>
+          {sectorsData.length > 0 ? (
+            <IrisBarChart
+              data={sectorsData}
+              horizontal={true}
+              useMicrotemaColors={true}
+              height={220}
+            />
+          ) : (
+            <div className="h-[220px] flex items-center justify-center text-text-muted text-sm">
+              Sem dados
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Voting Matrix */}
+      {(matrix ?? []).length > 0 && (
+        <div className="card">
+          <h2 className="section-label mb-4">Matriz de Votação</h2>
+          <VotacaoMatrix rows={matrix ?? []} />
         </div>
       )}
     </div>

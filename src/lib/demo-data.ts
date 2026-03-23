@@ -233,6 +233,8 @@ export const demoData = {
     const byTema = new Map<string, number>();
     for (const d of rows) byTema.set(d.microtema, (byTema.get(d.microtema) ?? 0) + 1);
     const topMicrotema = byTema.size > 0 ? [...byTema.entries()].sort((a, b) => b[1] - a[1])[0][0] : null;
+    const pauta_interna_count = rows.filter((d) => d.interessado === null).length;
+    const pauta_externa = total - pauta_interna_count;
     return {
       total_deliberacoes: total,
       deferidos,
@@ -242,6 +244,9 @@ export const demoData = {
       reunioes_unicas: dates.size,
       avg_confidence: 0.85,
       top_microtema: topMicrotema,
+      auto_classified_pct: 100,
+      pauta_externa,
+      pauta_interna_count,
     };
   },
 
@@ -432,6 +437,35 @@ export const demoData = {
       created_at: `${raw.data}T10:00:00Z`,
       votos: _buildVotos(raw),
     };
+  },
+
+  mandatosStats(agencia_id?: string | null) {
+    const rows = agencia_id ? DELIBERACOES_RAW.filter((d) => d.agencia === agencia_id) : DELIBERACOES_RAW;
+    const total = rows.length;
+    // Count unique director IDs for the agency
+    const dirs = agencia_id ? (AGENCY_DIRS[agencia_id] ?? []) : Object.values(AGENCY_DIRS).flat();
+    const diretores_ativos = dirs.length;
+    // Participações colegiadas = total votos (3 per deliberation)
+    const participacoes_colegiadas = total * dirs.length;
+    // Taxa de consenso: deliberações sem votos divergentes / total
+    const comDivergencia = rows.filter((d) => (d.divergentes ?? []).length > 0).length;
+    const taxa_consenso = total > 0
+      ? ((((total - comDivergencia) / total) * 100).toFixed(1) + "%")
+      : "100%";
+    return { diretores_ativos, participacoes_colegiadas, taxa_consenso, total_deliberacoes: total };
+  },
+
+  votacaoSectors(agencia_id?: string | null) {
+    const rows = agencia_id ? DELIBERACOES_RAW.filter((d) => d.agencia === agencia_id) : DELIBERACOES_RAW;
+    const counts = new Map<string, number>();
+    const dirs = agencia_id ? (AGENCY_DIRS[agencia_id] ?? []) : Object.values(AGENCY_DIRS).flat();
+    const votsPerDelib = dirs.length > 0 ? dirs.length : 3;
+    for (const d of rows) {
+      counts.set(d.microtema, (counts.get(d.microtema) ?? 0) + votsPerDelib);
+    }
+    return [...counts.entries()]
+      .map(([microtema, count]) => ({ microtema, count }))
+      .sort((a, b) => b.count - a.count);
   },
 
   uploadDemo(filenames: string[]) {
