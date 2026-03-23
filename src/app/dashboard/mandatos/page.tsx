@@ -216,6 +216,76 @@ export default function MandatosPage() {
         <KpiCard label="Deliberações" value={analytics?.total_deliberacoes ?? stats?.total_deliberacoes ?? "—"} />
       </div>
 
+      {/* ── ALERTAS & INTELIGÊNCIA ── */}
+      {(() => {
+        const hoje = Date.now();
+        const alertas = (mandatosAtivos ?? []).map((m) => {
+          const diasRestantes = m.data_fim
+            ? Math.round((new Date(m.data_fim).getTime() - hoje) / 86400000)
+            : null;
+          const rowMatrix = (matrix ?? []).find((r) => r.diretor_id === m.diretor_id);
+          const pctDiv = rowMatrix && rowMatrix.total > 0
+            ? (rowMatrix.divergente / rowMatrix.total) * 100
+            : 0;
+          return { ...m, diasRestantes, pctDiv };
+        }).filter((m) => (m.diasRestantes !== null && m.diasRestantes <= 180) || m.pctDiv >= 15);
+
+        if (alertas.length === 0) return null;
+
+        return (
+          <section>
+            <p className="section-label mb-3">Alertas & Inteligência</p>
+            <div className="space-y-2">
+              {alertas.map((alerta) => {
+                const expirando = alerta.diasRestantes !== null && alerta.diasRestantes <= 180;
+                const critico   = alerta.diasRestantes !== null && alerta.diasRestantes <= 30;
+                const altaDiv   = alerta.pctDiv >= 15;
+
+                return (
+                  <div key={alerta.id}>
+                    {expirando && (
+                      <div className={cn(
+                        "flex items-start gap-3 px-4 py-3 rounded-lg border text-sm",
+                        critico
+                          ? "bg-error/10 border-error/30 text-error"
+                          : "bg-warning/10 border-warning/30 text-warning"
+                      )}>
+                        <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="font-semibold">{alerta.diretor_nome}</p>
+                          <p className="text-xs opacity-80 mt-0.5">
+                            {alerta.diasRestantes !== null && alerta.diasRestantes > 0
+                              ? `Mandato expira em ${alerta.diasRestantes} dias (${formatDate(alerta.data_fim)})`
+                              : `Mandato encerrado em ${formatDate(alerta.data_fim)}`}
+                          </p>
+                        </div>
+                        <Link href={`/dashboard/mandatos/${alerta.diretor_id}`} className="ml-auto text-xs underline opacity-70 hover:opacity-100 shrink-0">
+                          Ver perfil
+                        </Link>
+                      </div>
+                    )}
+                    {altaDiv && (
+                      <div className="flex items-start gap-3 px-4 py-3 rounded-lg border bg-orange-500/10 border-orange-500/30 text-orange-400 text-sm mt-2 first:mt-0">
+                        <Shield className="w-4 h-4 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="font-semibold">{alerta.diretor_nome}</p>
+                          <p className="text-xs opacity-80 mt-0.5">
+                            Perfil divergente — {alerta.pctDiv.toFixed(1)}% de votos divergentes do colegiado
+                          </p>
+                        </div>
+                        <Link href={`/dashboard/mandatos/${alerta.diretor_id}`} className="ml-auto text-xs underline opacity-70 hover:opacity-100 shrink-0">
+                          Ver perfil
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })()}
+
       {/* Gantt */}
       {ganttRows.length > 0 && (
         <section className="card">

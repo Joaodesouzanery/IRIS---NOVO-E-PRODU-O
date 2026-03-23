@@ -1,14 +1,16 @@
 "use client";
 
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { cn, formatDate, getMicrotemaLabel, getMicrotemaColor } from "@/lib/utils";
-import type { DiretorProfile } from "@/types";
+import type { DiretorProfile, DiretorOverviewItem } from "@/types";
 import { GaugeChart } from "@/components/charts/GaugeChart";
 import { IrisPieChart } from "@/components/charts/IrisPieChart";
+import { IrisBarChart } from "@/components/charts/IrisBarChart";
 import Link from "next/link";
-import { ArrowLeft, Calendar, Building2, Award, TrendingUp } from "lucide-react";
+import { ArrowLeft, Calendar, Building2, Award, TrendingUp, AlertTriangle, Shield } from "lucide-react";
 
 function initials(nome: string): string {
   return nome.split(" ").filter((w) => w.length > 2).slice(0, 2).map((w) => w[0]).join("") || "??";
@@ -29,6 +31,35 @@ export default function DiretorProfilePage() {
     enabled: !!id,
   });
 
+  // Fetch all directors of same agency for comparison
+  const { data: todosDiretores } = useQuery({
+    queryKey: ["dashboard", "diretores-overview", profile?.agencia_id ?? ""],
+    queryFn: () => api.get<DiretorOverviewItem[]>(`/dashboard/diretores/overview${profile?.agencia_id ? `?agencia_id=${profile.agencia_id}` : ""}`),
+    enabled: !!profile?.agencia_id,
+  });
+
+  // Monthly vote timeline from historico
+  const monthlyTimeline = useMemo(() => {
+    if (!profile) return [];
+    const byMonth = new Map<string, { favoravel: number; desfavoravel: number }>();
+    for (const v of profile.historico) {
+      if (!v.data_reuniao) continue;
+      const period = v.data_reuniao.slice(0, 7);
+      if (!byMonth.has(period)) byMonth.set(period, { favoravel: 0, desfavoravel: 0 });
+      const s = byMonth.get(period)!;
+      if (v.tipo_voto === "Favoravel") s.favoravel++;
+      else if (v.tipo_voto === "Desfavoravel") s.desfavoravel++;
+    }
+    return [...byMonth.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([period, s]) => ({
+        name: period.slice(5) + "/" + period.slice(2, 4),
+        value: s.favoravel + s.desfavoravel,
+        favoravel: s.favoravel,
+        desfavoravel: s.desfavoravel,
+      }));
+  }, [profile]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20 text-text-muted text-sm animate-fade-in">
@@ -48,6 +79,31 @@ export default function DiretorProfilePage() {
 
   const { stats, tendencias, historico, por_microtema, mandato } = profile;
 
+  // ── Alert banners ──────────────────────────────────────────────────────
+  const diasRestantes = mandato.dias_restantes;
+  const expirando180 = mandato.status === "Ativo" && diasRestantes !== null && diasRestantes <= 180;
+  const expirando30  = expirando180 && diasRestantes !== null && diasRestantes <= 30;
+  const altaDiv      = stats.pct_divergente >= 15;
+
+  // ── Risk Score ─────────────────────────────────────────────────────────
+  const riskScore = Math.round(
+    (stats.pct_divergente * 0.5) +
+    (expirando180 ? 30 : 0) +
+    (stats.pct_divergente > 20 ? 20 : 0)
+  );
+  const riskLabel = riskScore < 20 ? "Baixo" : riskScore < 50 ? "Moderado" : "Elevado";
+  const riskColor = riskScore < 20 ? "text-success" : riskScore < 50 ? "text-warning" : "text-error";
+  const riskBarColor = riskScore < 20 ? "bg-success" : riskScore < 50 ? "bg-warning" : "bg-error";
+
+  // ── Colegiado comparison ───────────────────────────────────────────────
+  const colegiado = (todosDiretores ?? []).filter((d) => d.diretor_id !== id);
+  const mediaFavorPct = colegiado.length > 0
+    ? colegiado.reduce((s, d) => s + d.pct_favor, 0) / colegiado.length
+    : null;
+  const mediaDivPct = colegiado.length > 0
+    ? colegiado.reduce((s, d) => s + (d.total > 0 ? (d.divergente / d.total) * 100 : 0), 0) / colegiado.length
+    : null;
+
   // Pie data for vote distribution
   const pieData = [
     { name: "Favorável",     value: stats.favoravel,    color: "#22c55e" },
@@ -65,6 +121,30 @@ export default function DiretorProfilePage() {
         <ArrowLeft className="w-4 h-4" />
         Voltar para Mandatos
       </Link>
+
+      {/* Alert banners */}
+      {(expirando180 || altaDiv) && (
+        <div className="space-y-2">
+          {expirando30 && (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-lg border bg-error/10 border-error/30 text-error text-sm">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>Mandato expira em {diasRestantes} dias ({formatDate(mandato.data_fim)}) — renovação urgente necessária</span>
+            </div>
+          )}
+          {expirando180 && !expirando30 && (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-lg border bg-warning/10 border-warning/30 text-warning text-sm">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>Mandato expira em {diasRestantes} dias ({formatDate(mandato.data_fim)})</span>
+            </div>
+          )}
+          {altaDiv && (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-lg border bg-orange-500/10 border-orange-500/30 text-orange-400 text-sm">
+              <Shield className="w-4 h-4 shrink-0" />
+              <span>Perfil moderadamente divergente — {stats.pct_divergente.toFixed(1)}% de votos divergentes do colegiado</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Hero */}
       <div className="card p-6">
@@ -94,11 +174,12 @@ export default function DiretorProfilePage() {
                 <Calendar className="w-3.5 h-3.5" />
                 {formatDate(mandato.data_inicio)} → {formatDate(mandato.data_fim)}
               </span>
-              {mandato.status === "Ativo" && mandato.dias_restantes !== null && (
-                <span className="text-brand font-semibold">
-                  {mandato.dias_restantes > 0
-                    ? `${mandato.dias_restantes} dias restantes`
-                    : "Encerra hoje"}
+              {mandato.status === "Ativo" && diasRestantes !== null && (
+                <span className={cn(
+                  "font-semibold",
+                  expirando30 ? "text-error" : expirando180 ? "text-warning" : "text-brand"
+                )}>
+                  {diasRestantes > 0 ? `${diasRestantes} dias restantes` : "Encerra hoje"}
                 </span>
               )}
             </div>
@@ -127,8 +208,8 @@ export default function DiretorProfilePage() {
             { label: "Início", value: formatDate(mandato.data_inicio) },
             { label: "Término", value: formatDate(mandato.data_fim) },
             { label: "Status", value: mandato.status },
-            { label: "Dias restantes", value: mandato.status === "Ativo" && mandato.dias_restantes !== null
-              ? `${mandato.dias_restantes}d`
+            { label: "Dias restantes", value: mandato.status === "Ativo" && diasRestantes !== null
+              ? `${diasRestantes}d`
               : "—" },
           ].map((item) => (
             <div key={item.label} className="bg-bg-hover rounded-lg p-3 text-center">
@@ -157,7 +238,7 @@ export default function DiretorProfilePage() {
           {[
             { label: "Total de Votos", value: stats.total_votos, color: "text-text-primary" },
             { label: "Favorável", value: stats.favoravel, color: "text-success" },
-            { label: "Desfavorável", value: stats.desfavoravel, color: "text-danger" },
+            { label: "Desfavorável", value: stats.desfavoravel, color: "text-error" },
             { label: "Divergente", value: stats.divergente, color: "text-brand" },
           ].map((item) => (
             <div key={item.label} className="card text-center py-4">
@@ -182,6 +263,116 @@ export default function DiretorProfilePage() {
           </div>
         </div>
       </section>
+
+      {/* Score de Risco */}
+      <section className="card">
+        <h2 className="section-label mb-4 flex items-center gap-2">
+          <Shield className="w-4 h-4" />
+          Score de Risco
+        </h2>
+        <div className="flex items-center gap-6 flex-wrap">
+          <div className="flex-1 min-w-0 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-text-secondary">Nível de risco</span>
+              <span className={cn("font-mono text-lg font-bold", riskColor)}>
+                {riskLabel} — {riskScore}/100
+              </span>
+            </div>
+            <div className="w-full bg-bg-hover rounded-full h-3">
+              <div
+                className={cn("h-3 rounded-full transition-all", riskBarColor)}
+                style={{ width: `${Math.min(100, riskScore)}%` }}
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-xs text-text-muted mt-2">
+              <div className="text-center">
+                <p className="text-success font-mono font-semibold">0–19</p>
+                <p>Baixo</p>
+              </div>
+              <div className="text-center">
+                <p className="text-warning font-mono font-semibold">20–49</p>
+                <p>Moderado</p>
+              </div>
+              <div className="text-center">
+                <p className="text-error font-mono font-semibold">50+</p>
+                <p>Elevado</p>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-2 text-xs text-text-muted shrink-0 w-48">
+            <p className="font-mono uppercase tracking-wider text-[10px] mb-2">Fatores de risco</p>
+            <div className="flex justify-between">
+              <span>Divergência</span>
+              <span className={cn("font-mono", stats.pct_divergente >= 15 ? "text-error" : "text-text-secondary")}>
+                {stats.pct_divergente.toFixed(1)}% × 0.5
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Mandato expirando</span>
+              <span className={cn("font-mono", expirando180 ? "text-warning" : "text-text-secondary")}>
+                {expirando180 ? "+30" : "0"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Alta divergência (&gt;20%)</span>
+              <span className={cn("font-mono", stats.pct_divergente > 20 ? "text-error" : "text-text-secondary")}>
+                {stats.pct_divergente > 20 ? "+20" : "0"}
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Comparativo com Colegiado */}
+      {colegiado.length > 0 && mediaFavorPct !== null && (
+        <section className="card">
+          <h2 className="section-label mb-4 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4" />
+            Comparativo com o Colegiado
+          </h2>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="px-3 py-2 text-left text-xs text-text-muted font-mono uppercase tracking-wider"></th>
+                <th className="px-3 py-2 text-left text-xs text-text-muted font-mono uppercase tracking-wider">Este Diretor</th>
+                <th className="px-3 py-2 text-left text-xs text-text-muted font-mono uppercase tracking-wider">Média Colegiado</th>
+                <th className="px-3 py-2 text-left text-xs text-text-muted font-mono uppercase tracking-wider">Diferença</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                {
+                  label: "Taxa Favorável",
+                  mine: stats.pct_favoravel,
+                  media: mediaFavorPct,
+                  unit: "%",
+                  higherIsBetter: true,
+                },
+                {
+                  label: "Taxa Divergente",
+                  mine: stats.pct_divergente,
+                  media: mediaDivPct ?? 0,
+                  unit: "%",
+                  higherIsBetter: false,
+                },
+              ].map((row) => {
+                const diff = row.mine - row.media;
+                const isGood = row.higherIsBetter ? diff >= 0 : diff <= 0;
+                return (
+                  <tr key={row.label} className="border-b border-border/50">
+                    <td className="px-3 py-3 text-text-muted font-medium text-xs">{row.label}</td>
+                    <td className="px-3 py-3 font-mono text-text-primary">{row.mine.toFixed(1)}{row.unit}</td>
+                    <td className="px-3 py-3 font-mono text-text-secondary">{row.media.toFixed(1)}{row.unit}</td>
+                    <td className={cn("px-3 py-3 font-mono font-semibold text-xs", isGood ? "text-success" : "text-error")}>
+                      {diff >= 0 ? "+" : ""}{diff.toFixed(1)}{row.unit}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       {/* Tendências */}
       <section className="card">
@@ -223,6 +414,24 @@ export default function DiretorProfilePage() {
         </div>
       </section>
 
+      {/* Timeline Mensal de Votos */}
+      {monthlyTimeline.length > 0 && (
+        <section>
+          <h2 className="section-label mb-3">Timeline Mensal de Votos</h2>
+          <div className="card">
+            <IrisBarChart
+              data={monthlyTimeline}
+              height={220}
+              xKey="name"
+              multibar={[
+                { key: "favoravel",    color: "#22c55e", label: "Favorável" },
+                { key: "desfavoravel", color: "#ef4444", label: "Desfavorável" },
+              ]}
+            />
+          </div>
+        </section>
+      )}
+
       {/* Histórico de Votos */}
       <section>
         <h2 className="section-label mb-3">Histórico de Votos</h2>
@@ -251,7 +460,7 @@ export default function DiretorProfilePage() {
                       key={v.deliberacao_id}
                       className={cn(
                         "border-b border-border/40 hover:bg-bg-hover/50 transition-colors",
-                        v.is_divergente && "bg-danger/5"
+                        v.is_divergente && "bg-error/5"
                       )}
                     >
                       <td className="px-4 py-2.5 font-mono text-text-secondary whitespace-nowrap">
@@ -291,7 +500,7 @@ export default function DiretorProfilePage() {
                         <span className={cn(
                           "font-mono text-xs font-semibold",
                           v.tipo_voto === "Favoravel" ? "text-success" :
-                          v.tipo_voto === "Desfavoravel" ? "text-danger" : "text-text-muted"
+                          v.tipo_voto === "Desfavoravel" ? "text-error" : "text-text-muted"
                         )}>
                           {v.tipo_voto === "Favoravel" ? "Favorável" :
                            v.tipo_voto === "Desfavoravel" ? "Desfavorável" :

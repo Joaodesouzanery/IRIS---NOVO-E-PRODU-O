@@ -459,6 +459,47 @@ export const demoData = {
     return { total_deliberacoes: total, taxa_litigio, taxa_consenso, taxa_sancao, distribuicao_decisao, evolucao_mensal };
   },
 
+  empresas(agencia_id?: string | null) {
+    const rows = agencia_id
+      ? DELIBERACOES_RAW.filter((d) => d.agencia === agencia_id && d.interessado !== null)
+      : DELIBERACOES_RAW.filter((d) => d.interessado !== null);
+
+    const map = new Map<string, {
+      total: number; deferido: number; indeferido: number;
+      ultima: string; microtemas: Set<string>; agencia: string;
+    }>();
+
+    for (const d of rows) {
+      if (!d.interessado) continue;
+      if (!map.has(d.interessado)) {
+        map.set(d.interessado, { total: 0, deferido: 0, indeferido: 0, ultima: "", microtemas: new Set(), agencia: d.agencia });
+      }
+      const s = map.get(d.interessado)!;
+      s.total++;
+      if (d.resultado === "Deferido") s.deferido++;
+      else s.indeferido++;
+      if (!s.ultima || d.data > s.ultima) s.ultima = d.data;
+      s.microtemas.add(d.microtema);
+    }
+
+    return [...map.entries()]
+      .map(([nome, s]) => {
+        const microtemas = [...s.microtemas];
+        return {
+          nome,
+          total_deliberacoes: s.total,
+          deferidos: s.deferido,
+          indeferidos: s.indeferido,
+          pct_deferido: s.total > 0 ? (s.deferido / s.total) * 100 : 0,
+          ultima_deliberacao: s.ultima || null,
+          microtemas,
+          microtema_principal: microtemas[0] ?? null,
+          agencia_id: s.agencia,
+        };
+      })
+      .sort((a, b) => b.total_deliberacoes - a.total_deliberacoes);
+  },
+
   uploadDemo(filenames: string[]) {
     return {
       total: filenames.length, queued: 0, rejected: filenames.length,

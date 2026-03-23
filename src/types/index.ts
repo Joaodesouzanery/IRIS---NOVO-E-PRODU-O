@@ -246,6 +246,18 @@ export interface DiretorOverviewItem {
   pct_favor: number;
 }
 
+export interface EmpresaStats {
+  nome: string;
+  total_deliberacoes: number;
+  deferidos: number;
+  indeferidos: number;
+  pct_deferido: number;
+  ultima_deliberacao: string | null;
+  microtemas: string[];
+  microtema_principal: string | null;
+  agencia_id: string | null;
+}
+
 // ─── Upload Preview / Confirm ─────────────────────────────────────────────
 
 export interface PreviewResultFields {

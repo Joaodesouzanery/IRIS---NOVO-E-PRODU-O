@@ -17,6 +17,8 @@ import {
   TrendingUp,
   Grid3x3,
   Tag,
+  Building,
+  Layers,
 } from "lucide-react";
 
 interface NavItem {
@@ -45,6 +47,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
       { label: "Mandatos", href: "/dashboard/mandatos", icon: Users },
       { label: "Votação", href: "/dashboard/votacao", icon: Vote },
+      { label: "Dashboard 360°", href: "/dashboard/360", icon: Layers },
       { label: "Insights", href: "/dashboard/insights", icon: Lightbulb },
     ],
   },
@@ -54,6 +57,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: "Visão Geral",  href: "/dashboard/painel-regulatorio",           icon: TrendingUp },
       { label: "Setores",      href: "/dashboard/painel-regulatorio/setores",    icon: Grid3x3 },
       { label: "Microtemas",   href: "/dashboard/painel-regulatorio/microtemas", icon: Tag },
+      { label: "Empresas",     href: "/dashboard/empresas",                      icon: Building },
     ],
   },
   {
