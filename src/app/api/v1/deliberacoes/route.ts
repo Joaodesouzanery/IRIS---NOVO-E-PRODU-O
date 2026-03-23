@@ -119,3 +119,34 @@ export async function GET(req: NextRequest) {
     pages: Math.ceil((count ?? 0) / limit),
   });
 }
+
+export async function DELETE(req: NextRequest) {
+  if (isDemo(req)) {
+    // Demo mode: client handles localStorage deletion
+    return NextResponse.json({ deleted: 0, demo: true });
+  }
+
+  // Require explicit confirmation header — prevents accidental bulk deletes
+  if (req.headers.get("x-confirm-delete") !== "yes") {
+    return NextResponse.json(
+      { error: "Envie o header x-confirm-delete: yes" },
+      { status: 400 }
+    );
+  }
+
+  const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+  const db = createSupabaseServerClient();
+  const agencia_id = req.nextUrl.searchParams.get("agencia_id");
+
+  // Build delete query — neq("id","") selects all rows
+  let q = db.from("deliberacoes").delete().neq("id", "");
+  if (agencia_id) q = q.eq("agencia_id", agencia_id) as typeof q;
+
+  const { error, count } = await q;
+  if (error) {
+    console.error("[deliberacoes DELETE] Erro:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ deleted: count ?? 0 });
+}

@@ -1,7 +1,7 @@
 /**
  * POST /api/v1/upload/confirm
  * Recebe as deliberações revisadas pelo usuário e persiste no Supabase.
- * Demo mode: retorna 403 com mensagem explicativa.
+ * Demo mode: processa localmente e retorna as deliberações para localStorage.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -10,6 +10,8 @@ import type {
   BatchConfirmResponse,
   ConfirmResult,
   Resultado,
+  Deliberacao,
+  VotoEmbutido,
 } from "@/types";
 
 // Allowlist de resultados válidos — evita injeção de valores arbitrários
@@ -50,6 +52,9 @@ function sanitizeDelib(d: ConfirmDelib): ConfirmDelib {
     nomes_votacao: Array.isArray(d.nomes_votacao)
       ? d.nomes_votacao.slice(0, 20).map((n) => String(n).slice(0, 100))
       : [],
+    nomes_votacao_contra: Array.isArray(d.nomes_votacao_contra)
+      ? d.nomes_votacao_contra.slice(0, 20).map((n) => String(n).slice(0, 100))
+      : [],
     extraction_confidence:
       typeof d.extraction_confidence === "number" &&
       d.extraction_confidence >= 0 &&
@@ -60,46 +65,106 @@ function sanitizeDelib(d: ConfirmDelib): ConfirmDelib {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  // Demo mode — não há Supabase configurado
-  if (isDemo()) {
+  let body: { agencia_id?: unknown; deliberacoes?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Payload JSON inválido" }, { status: 400 });
+  }
+
+  const { agencia_id, deliberacoes } = body;
+
+  if (!agencia_id || typeof agencia_id !== "string") {
+    return NextResponse.json({ error: "agencia_id é obrigatório" }, { status: 400 });
+  }
+
+  if (!Array.isArray(deliberacoes) || deliberacoes.length === 0) {
     return NextResponse.json(
-      {
-        error:
-          "Modo demo: configure o Supabase para persistir deliberações. " +
-          "Defina NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY.",
-      },
-      { status: 403 }
+      { error: "deliberacoes deve ser um array não vazio" },
+      { status: 400 }
     );
   }
 
+  if (deliberacoes.length > 1000) {
+    return NextResponse.json(
+      { error: "Máximo de 1000 deliberações por envio" },
+      { status: 400 }
+    );
+  }
+
+  // ── Demo mode ─────────────────────────────────────────────────────────────
+  if (isDemo()) {
+    const { demoData } = await import("@/lib/demo-data");
+    const { findBestMatch } = await import("@/lib/server/name-matcher");
+
+    // Diretores da agência para name-matching
+    const diretoresList = demoData.mandatos()
+      .filter((m) => m.agencia_id === agencia_id)
+      .map((m) => ({ id: m.diretor_id, nome: m.diretor_nome, nome_variantes: [] as string[] }));
+
+    const createdDelibs: Deliberacao[] = [];
+    const results: ConfirmResult[] = [];
+
+    for (const raw of deliberacoes) {
+      const d = sanitizeDelib(raw as ConfirmDelib);
+      const id = `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const nomesContra = new Set(d.nomes_votacao_contra);
+
+      // Unanimidade fallback: se não há nomes → todos os diretores da agência votam a favor
+      const votingNames =
+        d.nomes_votacao.length > 0
+          ? d.nomes_votacao
+          : diretoresList.map((dir) => dir.nome);
+
+      const votos: VotoEmbutido[] = votingNames.map((nome) => {
+        const match = findBestMatch(nome, diretoresList);
+        const isContra = nomesContra.has(nome);
+        return {
+          id: `local-v-${Math.random().toString(36).slice(2, 9)}`,
+          diretor_id: match?.diretorId ?? nome,
+          diretor_nome: match?.diretorId
+            ? (diretoresList.find((d) => d.id === match.diretorId)?.nome ?? nome)
+            : nome,
+          tipo_voto: isContra ? "Desfavoravel" : "Favoravel",
+          is_divergente: isContra,
+          is_nominal: (match?.diretorId ?? null) !== null,
+        };
+      });
+
+      createdDelibs.push({
+        id,
+        agencia_id,
+        numero_deliberacao: d.numero_deliberacao,
+        reuniao_ordinaria: d.reuniao_ordinaria,
+        data_reuniao: d.data_reuniao,
+        interessado: d.interessado,
+        assunto: d.assunto,
+        processo: d.processo,
+        resultado: d.resultado as Resultado | null,
+        microtema: d.microtema,
+        pauta_interna: d.pauta_interna,
+        resumo_pleito: d.resumo_pleito,
+        fundamento_decisao: d.fundamento_decisao,
+        auto_classified: true,
+        extraction_confidence: d.extraction_confidence,
+        created_at: new Date().toISOString(),
+        votos,
+      });
+
+      results.push({ filename: d.filename, status: "created", deliberacao_id: id });
+    }
+
+    const response: BatchConfirmResponse = {
+      created: createdDelibs.length,
+      errors: 0,
+      results,
+      deliberacoes: createdDelibs,
+    };
+    return NextResponse.json(response, { status: 201 });
+  }
+
+  // ── Supabase mode ──────────────────────────────────────────────────────────
   try {
-    let body: { agencia_id?: unknown; deliberacoes?: unknown };
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json({ error: "Payload JSON inválido" }, { status: 400 });
-    }
-
-    const { agencia_id, deliberacoes } = body;
-
-    if (!agencia_id || typeof agencia_id !== "string") {
-      return NextResponse.json({ error: "agencia_id é obrigatório" }, { status: 400 });
-    }
-
-    if (!Array.isArray(deliberacoes) || deliberacoes.length === 0) {
-      return NextResponse.json(
-        { error: "deliberacoes deve ser um array não vazio" },
-        { status: 400 }
-      );
-    }
-
-    if (deliberacoes.length > 1000) {
-      return NextResponse.json(
-        { error: "Máximo de 1000 deliberações por envio" },
-        { status: 400 }
-      );
-    }
-
     const { createSupabaseServerClient } = await import("@/lib/supabase/server");
     const { findBestMatch } = await import("@/lib/server/name-matcher");
 
@@ -164,17 +229,26 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           continue;
         }
 
-        // Cria votos via name-matcher
-        if (d.nomes_votacao.length > 0) {
-          const votoRows = d.nomes_votacao
+        // Cria votos com direção correta e fallback de unanimidade
+        const nomesContra = new Set(d.nomes_votacao_contra);
+
+        // Unanimidade fallback: sem nomes → todos os diretores da agência
+        const votingNames =
+          d.nomes_votacao.length > 0
+            ? d.nomes_votacao
+            : diretoresList.map((dir) => dir.nome);
+
+        if (votingNames.length > 0) {
+          const votoRows = votingNames
             .map((nome) => {
               const match = findBestMatch(nome, diretoresList);
+              const isContra = nomesContra.has(nome);
               return {
                 deliberacao_id: delib.id as string,
                 diretor_id: match?.diretorId ?? null,
-                tipo_voto: "Favoravel" as const,
-                is_divergente: false,
-                is_nominal: true,
+                tipo_voto: isContra ? ("Desfavoravel" as const) : ("Favoravel" as const),
+                is_divergente: isContra,
+                is_nominal: (match?.diretorId ?? null) !== null,
               };
             })
             .filter((v) => v.diretor_id !== null);

@@ -17,6 +17,7 @@ import {
   Upload, FileText, CheckCircle, XCircle, Loader2,
   ChevronDown, ChevronRight, Trash2, RefreshCw, Copy, AlertTriangle,
 } from "lucide-react";
+import { appendLocalDelibs } from "@/lib/local-store";
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
 
@@ -529,6 +530,7 @@ export default function UploadPage() {
         resumo_pleito: fields.resumo_pleito,
         fundamento_decisao: fields.fundamento_decisao,
         nomes_votacao: fields.nomes_votacao,
+        nomes_votacao_contra: fields.nomes_votacao_contra ?? [],
         extraction_confidence: item.confidence,
       };
     });
@@ -538,6 +540,10 @@ export default function UploadPage() {
         agencia_id: agenciaId,
         deliberacoes,
       });
+      // Demo mode: persist returned deliberações in localStorage
+      if (res.deliberacoes && res.deliberacoes.length > 0) {
+        appendLocalDelibs(res.deliberacoes);
+      }
       setConfirmResults(res);
       setStage("done");
     } catch (err) {
@@ -807,6 +813,11 @@ export default function UploadPage() {
               {confirmResults.errors > 0 && (
                 <p className="text-xs text-error mt-0.5">
                   {confirmResults.errors} falha{confirmResults.errors !== 1 ? "s" : ""} — veja abaixo
+                </p>
+              )}
+              {confirmResults.deliberacoes && confirmResults.deliberacoes.length > 0 && (
+                <p className="text-xs text-text-muted mt-0.5">
+                  Salvo localmente — configure o Supabase para persistência permanente.
                 </p>
               )}
             </div>

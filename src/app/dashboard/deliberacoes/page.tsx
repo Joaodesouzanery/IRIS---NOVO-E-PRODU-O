@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { cn, formatDate, getMicrotemaLabel } from "@/lib/utils";
-import type { DeliberacaoPaginada, Agencia } from "@/types";
-import { Search, Filter, Download, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import type { DeliberacaoPaginada, Agencia, Deliberacao } from "@/types";
+import { Search, Download, ChevronLeft, ChevronRight, ExternalLink, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { getLocalDelibs, clearLocalDelibs } from "@/lib/local-store";
 
 const MICROTEMAS = [
   "tarifa", "obras", "multa", "contrato", "reequilibrio",
@@ -49,6 +50,25 @@ export default function DeliberacoesPage() {
     queryFn: () => api.get<Agencia[]>("/agencias"),
   });
 
+  const [localDelibs, setLocalDelibs] = useState<Deliberacao[]>([]);
+  useEffect(() => { setLocalDelibs(getLocalDelibs()); }, []);
+
+  // Merge: localStorage items first (recently uploaded), then API items (dedup by id)
+  const allDelibs = useMemo(() => {
+    const apiIds = new Set((data?.data ?? []).map((d) => d.id));
+    return [
+      ...localDelibs.filter((d) => !apiIds.has(d.id)),
+      ...(data?.data ?? []),
+    ];
+  }, [data, localDelibs]);
+
+  const localOnlyCount = useMemo(() => {
+    const apiIds = new Set((data?.data ?? []).map((d) => d.id));
+    return localDelibs.filter((d) => !apiIds.has(d.id)).length;
+  }, [data, localDelibs]);
+
+  const totalCount = (data?.total ?? 0) + localOnlyCount;
+
   const handleSearch = (value: string) => {
     setSearch(value);
     setPage(1);
@@ -67,13 +87,34 @@ export default function DeliberacoesPage() {
         <div>
           <h1 className="text-xl font-semibold text-text-primary">Deliberações</h1>
           <p className="text-sm text-text-muted mt-0.5">
-            {data?.total ? `${data.total.toLocaleString("pt-BR")} deliberações encontradas` : "Buscando..."}
+            {totalCount > 0
+              ? `${totalCount.toLocaleString("pt-BR")} deliberações encontradas`
+              : data ? "Nenhuma deliberação encontrada" : "Buscando..."}
+            {localOnlyCount > 0 && (
+              <span className="ml-1 text-brand font-mono">({localOnlyCount} local)</span>
+            )}
           </p>
         </div>
-        <button onClick={handleExport} className="btn-secondary gap-1.5">
-          <Download className="w-3.5 h-3.5" />
-          Exportar CSV
-        </button>
+        <div className="flex items-center gap-2">
+          {localDelibs.length > 0 && (
+            <button
+              className="btn-secondary text-xs text-danger border-danger/30 hover:bg-danger/10 flex items-center gap-1.5"
+              onClick={() => {
+                if (window.confirm(`Excluir ${localDelibs.length} deliberaç${localDelibs.length !== 1 ? "ões" : "ão"} salvas localmente?`)) {
+                  clearLocalDelibs();
+                  setLocalDelibs([]);
+                }
+              }}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Excluir {localDelibs.length} locais
+            </button>
+          )}
+          <button onClick={handleExport} className="btn-secondary gap-1.5">
+            <Download className="w-3.5 h-3.5" />
+            Exportar CSV
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -209,14 +250,14 @@ export default function DeliberacoesPage() {
                     Carregando deliberações...
                   </td>
                 </tr>
-              ) : data?.data.length === 0 ? (
+              ) : allDelibs.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-text-muted text-sm">
                     Nenhuma deliberação encontrada
                   </td>
                 </tr>
               ) : (
-                (data?.data ?? []).map((d) => (
+                allDelibs.map((d) => (
                   <tr
                     key={d.id}
                     className="border-b border-border/50 hover:bg-bg-hover transition-colors"

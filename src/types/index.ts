@@ -261,6 +261,7 @@ export interface PreviewResultFields {
   resumo_pleito: string | null;
   fundamento_decisao: string | null;
   nomes_votacao: string[];
+  nomes_votacao_contra: string[];
 }
 
 export interface PreviewResult {
@@ -296,6 +297,7 @@ export interface ConfirmDelib {
   resumo_pleito: string | null;
   fundamento_decisao: string | null;
   nomes_votacao: string[];
+  nomes_votacao_contra: string[];
   extraction_confidence: number;
 }
 
@@ -310,4 +312,5 @@ export interface BatchConfirmResponse {
   created: number;
   errors: number;
   results: ConfirmResult[];
+  deliberacoes?: Deliberacao[];
 }
