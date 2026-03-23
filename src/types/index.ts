@@ -3,13 +3,20 @@
 export type Microtema =
   | "tarifa" | "obras" | "multa" | "contrato" | "reequilibrio"
   | "fiscalizacao" | "seguranca" | "ambiental" | "desapropriacao"
-  | "usuario" | "outros";
+  | "adimplencia" | "pessoal" | "usuario" | "outros";
 
 export type Resultado =
   | "Deferido"
   | "Indeferido"
   | "Parcialmente Deferido"
-  | "Retirado de Pauta";
+  | "Retirado de Pauta"
+  | "Ratificado"
+  | "Aprovado"
+  | "Aprovado com Ressalvas"
+  | "Aprovado por Unanimidade"
+  | "Recomendado"
+  | "Determinado"
+  | "Autorizado";
 
 export interface Agencia {
   id: string;
@@ -57,6 +64,7 @@ export interface Deliberacao {
   reuniao_ordinaria: string | null;
   processo: string | null;
   interessado: string | null;
+  assunto?: string | null;
   microtema: string | null;
   resultado: Resultado | null;
   pauta_interna: boolean;
@@ -83,7 +91,7 @@ export interface DeliberacaoPaginada {
 export interface UploadJobResult {
   filename: string;
   job_id: string | null;
-  status: "queued" | "duplicate" | "rejected" | "error";
+  status: "queued" | "done" | "duplicate" | "rejected" | "error";
   message?: string;
 }
 

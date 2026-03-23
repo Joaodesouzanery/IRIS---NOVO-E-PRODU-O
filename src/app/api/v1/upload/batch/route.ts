@@ -22,11 +22,82 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
 
-    // Modo demo: rejeita uploads mas retorna resposta amigável
+    // Modo demo: processa PDFs via NLP sem persistir no Supabase.
+    // Extrai campos e retorna resultado imediato (status "done") para cada arquivo válido.
     if (isDemo(req)) {
       const files = formData.getAll("files") as File[];
-      const filenames = files.map((f) => f.name);
-      return NextResponse.json(demoData.uploadDemo(filenames), { status: 200 });
+      if (files.length === 0) {
+        return NextResponse.json({ error: "Nenhum arquivo enviado" }, { status: 400 });
+      }
+
+      const { isPdfBuffer, extractPdfText } = await import("@/lib/server/pdf-extractor");
+      const { extractFields } = await import("@/lib/server/nlp-extractor");
+      const { classifyMicrotema } = await import("@/lib/server/classifier");
+
+      const results: Array<{ filename: string; job_id: string | null; status: string; message?: string }> = [];
+
+      for (const file of files) {
+        if (file.size > MAX_FILE_SIZE) {
+          results.push({
+            filename: file.name, job_id: null, status: "rejected",
+            message: `Arquivo muito grande (${(file.size / 1024 / 1024).toFixed(1)} MB, máx 50 MB)`,
+          });
+          continue;
+        }
+
+        const buffer = Buffer.from(await file.arrayBuffer());
+
+        if (!isPdfBuffer(buffer)) {
+          results.push({
+            filename: file.name, job_id: null, status: "rejected",
+            message: "Arquivo inválido: não é um PDF (magic bytes incorretos)",
+          });
+          continue;
+        }
+
+        let extraction: Awaited<ReturnType<typeof extractPdfText>>;
+        try {
+          extraction = await extractPdfText(buffer);
+        } catch {
+          results.push({
+            filename: file.name, job_id: null, status: "rejected",
+            message: "Falha ao extrair texto do PDF",
+          });
+          continue;
+        }
+
+        if (!extraction.text || extraction.text.length < 50) {
+          results.push({
+            filename: file.name, job_id: null, status: "rejected",
+            message: "PDF sem texto extraível — possível documento digitalizado (imagem)",
+          });
+          continue;
+        }
+
+        const fields = extractFields(extraction.text);
+        const { microtema } = classifyMicrotema(extraction.text);
+
+        const partes: string[] = [];
+        if (fields.numero_deliberacao) partes.push(`Deliberação nº ${fields.numero_deliberacao}`);
+        if (fields.reuniao_ordinaria)  partes.push(fields.reuniao_ordinaria);
+        if (fields.data_reuniao)       partes.push(fields.data_reuniao);
+        if (fields.resultado)          partes.push(fields.resultado);
+        if (microtema && microtema !== "outros") partes.push(`[${microtema}]`);
+        const summary = partes.length > 0
+          ? partes.join(" · ")
+          : "Campos extraídos — configure o Supabase para persistir os dados";
+
+        results.push({
+          filename: file.name,
+          job_id: crypto.randomUUID(), // ID fictício — status já é terminal, não haverá polling
+          status: "done",
+          message: summary,
+        });
+      }
+
+      const processed = results.filter((r) => r.status === "done").length;
+      const rejected  = results.filter((r) => r.status === "rejected").length;
+      return NextResponse.json({ total: files.length, queued: processed, rejected, results });
     }
 
     // Importação dinâmica para evitar erro em build sem credenciais

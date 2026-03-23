@@ -11,10 +11,10 @@ const A_ARTESP = "demo-agency-artesp";
 const A_ANEEL  = "demo-agency-aneel";
 const A_ANVISA = "demo-agency-anvisa";
 
-// Diretores ARTESP
-const DA1 = "demo-dir-artesp-1"; // Carlos Eduardo Mendonça
-const DA2 = "demo-dir-artesp-2"; // Fernanda Luz Ribeiro
-const DA3 = "demo-dir-artesp-3"; // Rodrigo Alves Correia
+// Diretores ARTESP — nomes reais conforme deliberações jan/2026
+const DA1 = "demo-dir-artesp-1"; // André Isper Rodrigues Barnabé (Diretor-Presidente)
+const DA2 = "demo-dir-artesp-2"; // Diego Albert Zanatto (Diretor)
+const DA3 = "demo-dir-artesp-3"; // Fernanda Esbízaro Rodrigues Rudnik (Diretora)
 
 // Diretores ANEEL
 const DN1 = "demo-dir-aneel-1";  // Sandoval Feitosa Filho
@@ -29,9 +29,9 @@ const DV3 = "demo-dir-anvisa-3"; // Cristiane Prado
 // ─── Mapeamento agência → diretores ──────────────────────────────────────
 const AGENCY_DIRS: Record<string, Array<{ id: string; nome: string }>> = {
   [A_ARTESP]: [
-    { id: DA1, nome: "Carlos Eduardo Mendonça" },
-    { id: DA2, nome: "Fernanda Luz Ribeiro" },
-    { id: DA3, nome: "Rodrigo Alves Correia" },
+    { id: DA1, nome: "André Isper Rodrigues Barnabé" },
+    { id: DA2, nome: "Diego Albert Zanatto" },
+    { id: DA3, nome: "Fernanda Esbízaro Rodrigues Rudnik" },
   ],
   [A_ANEEL]: [
     { id: DN1, nome: "Sandoval Feitosa Filho" },
@@ -197,9 +197,9 @@ export const demoData = {
 
   diretores() {
     return [
-      { id: DA1, nome: "Carlos Eduardo Mendonça", agencia_id: A_ARTESP, cargo: "Diretor-Presidente", needs_review: false, ativo: true, created_at: "2020-01-10T10:00:00Z" },
-      { id: DA2, nome: "Fernanda Luz Ribeiro",    agencia_id: A_ARTESP, cargo: "Diretora",           needs_review: false, ativo: true, created_at: "2021-03-10T10:00:00Z" },
-      { id: DA3, nome: "Rodrigo Alves Correia",   agencia_id: A_ARTESP, cargo: "Diretor",            needs_review: false, ativo: true, created_at: "2020-07-22T10:00:00Z" },
+      { id: DA1, nome: "André Isper Rodrigues Barnabé",      agencia_id: A_ARTESP, cargo: "Diretor-Presidente", needs_review: false, ativo: true, created_at: "2023-06-15T10:00:00Z" },
+      { id: DA2, nome: "Diego Albert Zanatto",             agencia_id: A_ARTESP, cargo: "Diretor",            needs_review: false, ativo: true, created_at: "2021-03-10T10:00:00Z" },
+      { id: DA3, nome: "Fernanda Esbízaro Rodrigues Rudnik", agencia_id: A_ARTESP, cargo: "Diretora",         needs_review: false, ativo: true, created_at: "2022-07-22T10:00:00Z" },
       { id: DN1, nome: "Sandoval Feitosa Filho",  agencia_id: A_ANEEL,  cargo: "Diretor-Geral",      needs_review: false, ativo: true, created_at: "2019-06-01T10:00:00Z" },
       { id: DN2, nome: "Maria Vitória Campos",    agencia_id: A_ANEEL,  cargo: "Diretora",           needs_review: false, ativo: true, created_at: "2021-04-15T10:00:00Z" },
       { id: DN3, nome: "José Luís Schiffer",      agencia_id: A_ANEEL,  cargo: "Diretor",            needs_review: false, ativo: true, created_at: "2022-02-01T10:00:00Z" },
@@ -211,9 +211,9 @@ export const demoData = {
 
   mandatos() {
     return [
-      { id: "demo-m-1", diretor_id: DA1, diretor_nome: "Carlos Eduardo Mendonça", cargo: "Diretor-Presidente", agencia_id: A_ARTESP, data_inicio: "2024-01-15", data_fim: "2028-01-14", status: "Ativo" as const },
-      { id: "demo-m-2", diretor_id: DA2, diretor_nome: "Fernanda Luz Ribeiro",    cargo: "Diretora",           agencia_id: A_ARTESP, data_inicio: "2023-03-10", data_fim: "2027-03-09", status: "Ativo" as const },
-      { id: "demo-m-3", diretor_id: DA3, diretor_nome: "Rodrigo Alves Correia",   cargo: "Diretor",            agencia_id: A_ARTESP, data_inicio: "2022-07-22", data_fim: "2026-07-21", status: "Ativo" as const },
+      { id: "demo-m-1", diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",       cargo: "Diretor-Presidente", agencia_id: A_ARTESP, data_inicio: "2023-06-15", data_fim: "2027-06-14", status: "Ativo" as const },
+      { id: "demo-m-2", diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               cargo: "Diretor",            agencia_id: A_ARTESP, data_inicio: "2021-03-10", data_fim: "2025-03-09", status: "Ativo" as const },
+      { id: "demo-m-3", diretor_id: DA3, diretor_nome: "Fernanda Esbízaro Rodrigues Rudnik", cargo: "Diretora",           agencia_id: A_ARTESP, data_inicio: "2022-07-22", data_fim: "2026-07-21", status: "Ativo" as const },
       { id: "demo-m-4", diretor_id: DN1, diretor_nome: "Sandoval Feitosa Filho",  cargo: "Diretor-Geral",      agencia_id: A_ANEEL,  data_inicio: "2023-06-01", data_fim: "2027-05-31", status: "Ativo" as const },
       { id: "demo-m-5", diretor_id: DN2, diretor_nome: "Maria Vitória Campos",    cargo: "Diretora",           agencia_id: A_ANEEL,  data_inicio: "2021-04-15", data_fim: "2025-04-14", status: "Ativo" as const },
       { id: "demo-m-6", diretor_id: DN3, diretor_nome: "José Luís Schiffer",      cargo: "Diretor",            agencia_id: A_ANEEL,  data_inicio: "2022-02-01", data_fim: "2026-01-31", status: "Ativo" as const },
@@ -282,9 +282,9 @@ export const demoData = {
   // Valores matematicamente consistentes com _buildVotos.
   diretoresOverview(agencia_id?: string | null) {
     const all = [
-      { diretor_id: DA1, diretor_nome: "Carlos Eduardo Mendonça", agencia: A_ARTESP, total: 10, favoravel: 8,  desfavoravel: 2, divergente: 0, pct_favor: 80.0 },
-      { diretor_id: DA2, diretor_nome: "Fernanda Luz Ribeiro",    agencia: A_ARTESP, total: 10, favoravel: 9,  desfavoravel: 1, divergente: 1, pct_favor: 90.0 },
-      { diretor_id: DA3, diretor_nome: "Rodrigo Alves Correia",   agencia: A_ARTESP, total: 10, favoravel: 9,  desfavoravel: 1, divergente: 1, pct_favor: 90.0 },
+      { diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",       agencia: A_ARTESP, total: 10, favoravel: 8,  desfavoravel: 2, divergente: 0, pct_favor: 80.0 },
+      { diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               agencia: A_ARTESP, total: 10, favoravel: 9,  desfavoravel: 1, divergente: 1, pct_favor: 90.0 },
+      { diretor_id: DA3, diretor_nome: "Fernanda Esbízaro Rodrigues Rudnik", agencia: A_ARTESP, total: 10, favoravel: 9,  desfavoravel: 1, divergente: 1, pct_favor: 90.0 },
       { diretor_id: DN1, diretor_nome: "Sandoval Feitosa Filho",  agencia: A_ANEEL,  total: 8,  favoravel: 8,  desfavoravel: 0, divergente: 1, pct_favor: 100.0 },
       { diretor_id: DN2, diretor_nome: "Maria Vitória Campos",    agencia: A_ANEEL,  total: 8,  favoravel: 7,  desfavoravel: 1, divergente: 0, pct_favor: 87.5 },
       { diretor_id: DN3, diretor_nome: "José Luís Schiffer",      agencia: A_ANEEL,  total: 8,  favoravel: 7,  desfavoravel: 1, divergente: 0, pct_favor: 87.5 },
@@ -319,9 +319,9 @@ export const demoData = {
 
   votacaoMatrix(agencia_id?: string | null) {
     const all = [
-      { diretor_id: DA1, diretor_nome: "Carlos Eduardo Mendonça", agencia: A_ARTESP, total: 10, favoravel: 8,  desfavoravel: 2, abstencao: 0, divergente: 0 },
-      { diretor_id: DA2, diretor_nome: "Fernanda Luz Ribeiro",    agencia: A_ARTESP, total: 10, favoravel: 9,  desfavoravel: 1, abstencao: 0, divergente: 1 },
-      { diretor_id: DA3, diretor_nome: "Rodrigo Alves Correia",   agencia: A_ARTESP, total: 10, favoravel: 9,  desfavoravel: 1, abstencao: 0, divergente: 1 },
+      { diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",       agencia: A_ARTESP, total: 10, favoravel: 8,  desfavoravel: 2, abstencao: 0, divergente: 0 },
+      { diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               agencia: A_ARTESP, total: 10, favoravel: 9,  desfavoravel: 1, abstencao: 0, divergente: 1 },
+      { diretor_id: DA3, diretor_nome: "Fernanda Esbízaro Rodrigues Rudnik", agencia: A_ARTESP, total: 10, favoravel: 9,  desfavoravel: 1, abstencao: 0, divergente: 1 },
       { diretor_id: DN1, diretor_nome: "Sandoval Feitosa Filho",  agencia: A_ANEEL,  total: 8,  favoravel: 8,  desfavoravel: 0, abstencao: 0, divergente: 1 },
       { diretor_id: DN2, diretor_nome: "Maria Vitória Campos",    agencia: A_ANEEL,  total: 8,  favoravel: 7,  desfavoravel: 1, abstencao: 0, divergente: 0 },
       { diretor_id: DN3, diretor_nome: "José Luís Schiffer",      agencia: A_ANEEL,  total: 8,  favoravel: 7,  desfavoravel: 1, abstencao: 0, divergente: 0 },
@@ -356,9 +356,9 @@ export const demoData = {
 
   votacaoFidelidade(agencia_id?: string | null) {
     const all = [
-      { diretor_id: DA1, diretor_nome: "Carlos Eduardo Mendonça", agencia: A_ARTESP, total_votos: 10, votos_nominais: 2, votos_divergentes: 0, taxa_fidelidade: "100.0" },
-      { diretor_id: DA2, diretor_nome: "Fernanda Luz Ribeiro",    agencia: A_ARTESP, total_votos: 10, votos_nominais: 2, votos_divergentes: 1, taxa_fidelidade: "90.0" },
-      { diretor_id: DA3, diretor_nome: "Rodrigo Alves Correia",   agencia: A_ARTESP, total_votos: 10, votos_nominais: 2, votos_divergentes: 1, taxa_fidelidade: "90.0" },
+      { diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",       agencia: A_ARTESP, total_votos: 10, votos_nominais: 2, votos_divergentes: 0, taxa_fidelidade: "100.0" },
+      { diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               agencia: A_ARTESP, total_votos: 10, votos_nominais: 2, votos_divergentes: 1, taxa_fidelidade: "90.0" },
+      { diretor_id: DA3, diretor_nome: "Fernanda Esbízaro Rodrigues Rudnik", agencia: A_ARTESP, total_votos: 10, votos_nominais: 2, votos_divergentes: 1, taxa_fidelidade: "90.0" },
       { diretor_id: DN1, diretor_nome: "Sandoval Feitosa Filho",  agencia: A_ANEEL,  total_votos: 8,  votos_nominais: 1, votos_divergentes: 1, taxa_fidelidade: "87.5" },
       { diretor_id: DN2, diretor_nome: "Maria Vitória Campos",    agencia: A_ANEEL,  total_votos: 8,  votos_nominais: 1, votos_divergentes: 0, taxa_fidelidade: "100.0" },
       { diretor_id: DN3, diretor_nome: "José Luís Schiffer",      agencia: A_ANEEL,  total_votos: 8,  votos_nominais: 1, votos_divergentes: 0, taxa_fidelidade: "100.0" },

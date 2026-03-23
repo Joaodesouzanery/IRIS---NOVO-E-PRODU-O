@@ -1,7 +1,7 @@
 /**
  * classifier.ts
- * Port exato de worker/app/pipeline/classifier.py
  * Classifica microtema e pauta interna por keywords determinísticas.
+ * Keywords expandidas com base nas deliberações ARTESP reais (jan/2026).
  */
 
 // ─── Dicionário de microtemas ─────────────────────────────────────────────
@@ -10,11 +10,14 @@ const MICROTEMA_KEYWORDS: Record<string, string[]> = {
     "tarifa", "reajuste tarifário", "revisão tarifária", "reajuste de tarifa",
     "reequilíbrio tarifário", "reequilibrio tarifario", "preço público",
     "taxa de pedágio", "pedágio", "tarifa de pedágio",
+    "reajuste do pedágio", "impacto tarifário", "impacto proporcional",
+    "passageiro equivalente", "linhas metropolitanas", "tarifa de transporte",
   ],
   obras: [
     "obra", "obras", "construção", "reforma", "ampliação", "duplicação",
     "pavimentação", "infraestrutura viária", "melhorias", "investimento em obra",
-    "projeto executivo", "prazo de obra",
+    "projeto executivo", "prazo de obra", "conservação de pavimento",
+    "obras de ampliação", "obras de arte especiais", "conservação especial",
   ],
   multa: [
     "multa", "penalidade", "infração", "autuação", "auto de infração",
@@ -23,19 +26,25 @@ const MICROTEMA_KEYWORDS: Record<string, string[]> = {
   contrato: [
     "contrato", "concessão", "aditivo", "aditamento", "termo aditivo",
     "prorrogação de contrato", "rescisão", "subconcessão", "subconcessionária",
+    "termo aditivo e modificativo", "modificativo", "prorrogar", "prorrogação",
+    "vigência contratual", "consórcio supervisor", "contrato de concessão",
+    "serviços técnicos especializados",
   ],
   reequilibrio: [
     "reequilíbrio econômico", "reequilibrio economico", "equilíbrio econômico-financeiro",
     "desequilíbrio", "fato imprevisível", "caso fortuito", "força maior",
-    "revisão extraordinária",
+    "revisão extraordinária", "desequilíbrio econômico-financeiro",
+    "cronograma físico-financeiro", "adequação de cronograma",
   ],
   fiscalizacao: [
     "fiscalização", "vistoria", "inspeção", "auditoria", "relatório de fiscalização",
     "irregularidade", "notificação", "descumprimento", "inadimplemento",
+    "coordenação", "monitoramento de pavimento", "inspeção de obras de artes",
   ],
   seguranca: [
     "segurança", "acidente", "risco", "sinalização", "capacete", "cinto",
     "segurança viária", "condições de tráfego", "manutenção preventiva",
+    "saúde e segurança no trabalho",
   ],
   ambiental: [
     "ambiental", "meio ambiente", "licença ambiental", "impacto ambiental",
@@ -45,6 +54,16 @@ const MICROTEMA_KEYWORDS: Record<string, string[]> = {
   desapropriacao: [
     "desapropriação", "desapropriacao", "indenização", "faixa de domínio",
     "servidão administrativa", "área afetada", "proprietário",
+  ],
+  adimplencia: [
+    "adimplência", "adimplencia", "adimplente", "declaração de adimplência",
+    "adimplência contratual", "inadimplência contratual",
+  ],
+  pessoal: [
+    "portaria", "designa", "designação", "substituição", "substitui",
+    "cargo em comissão", "empregado", "servidor", "superintendência",
+    "indicação para substituição", "cargo em comissão de comando",
+    "impedimentos legais e temporários", "titular de cargo",
   ],
   usuario: [
     "usuário", "reclamação", "ouvidoria", "manifestação", "atendimento ao usuário",
@@ -65,27 +84,17 @@ export function classifyMicrotema(text: string): ClassificationResult {
   for (const [tema, keywords] of Object.entries(MICROTEMA_KEYWORDS)) {
     let matches = 0;
     for (const kw of keywords) {
-      // Word-boundary equivalente: verifica presença da keyword
-      if (textLower.includes(kw.toLowerCase())) {
-        matches++;
-      }
+      if (textLower.includes(kw.toLowerCase())) matches++;
     }
-    if (matches > 0) {
-      scores.set(tema, matches);
-    }
+    if (matches > 0) scores.set(tema, matches);
   }
 
-  if (scores.size === 0) {
-    return { microtema: "outros", confidence: 0 };
-  }
+  if (scores.size === 0) return { microtema: "outros", confidence: 0 };
 
   const totalMatches = [...scores.values()].reduce((a, b) => a + b, 0);
   const [[bestTema, bestScore]] = [...scores.entries()].sort((a, b) => b[1] - a[1]);
 
-  return {
-    microtema: bestTema,
-    confidence: bestScore / totalMatches,
-  };
+  return { microtema: bestTema, confidence: bestScore / totalMatches };
 }
 
 // ─── Classificação de pauta interna ──────────────────────────────────────
@@ -99,6 +108,10 @@ const PAUTA_INTERNA_KEYWORDS = [
   "orçamento interno",
   "regimento interno",
   "resolução interna",
+  "designação de empregado",
+  "indicação para substituição",
+  "cargo em comissão de comando",
+  "empregado/servidor",
 ];
 
 export function classifyPautaInterna(text: string): boolean {
