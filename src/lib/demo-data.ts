@@ -210,17 +210,22 @@ export const demoData = {
   },
 
   mandatos() {
-    return [
-      { id: "demo-m-1", diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",       cargo: "Diretor-Presidente", agencia_id: A_ARTESP, data_inicio: "2023-06-15", data_fim: "2027-06-14", status: "Ativo" as const },
-      { id: "demo-m-2", diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               cargo: "Diretor",            agencia_id: A_ARTESP, data_inicio: "2021-03-10", data_fim: "2025-03-09", status: "Ativo" as const },
-      { id: "demo-m-3", diretor_id: DA3, diretor_nome: "Fernanda Esbízaro Rodrigues Rudnik", cargo: "Diretora",           agencia_id: A_ARTESP, data_inicio: "2022-07-22", data_fim: "2026-07-21", status: "Ativo" as const },
-      { id: "demo-m-4", diretor_id: DN1, diretor_nome: "Sandoval Feitosa Filho",  cargo: "Diretor-Geral",      agencia_id: A_ANEEL,  data_inicio: "2023-06-01", data_fim: "2027-05-31", status: "Ativo" as const },
-      { id: "demo-m-5", diretor_id: DN2, diretor_nome: "Maria Vitória Campos",    cargo: "Diretora",           agencia_id: A_ANEEL,  data_inicio: "2021-04-15", data_fim: "2025-04-14", status: "Ativo" as const },
-      { id: "demo-m-6", diretor_id: DN3, diretor_nome: "José Luís Schiffer",      cargo: "Diretor",            agencia_id: A_ANEEL,  data_inicio: "2022-02-01", data_fim: "2026-01-31", status: "Ativo" as const },
-      { id: "demo-m-7", diretor_id: DV1, diretor_nome: "Ana Beatriz Mendes",      cargo: "Diretora-Presidente",agencia_id: A_ANVISA, data_inicio: "2024-09-01", data_fim: "2028-08-31", status: "Ativo" as const },
-      { id: "demo-m-8", diretor_id: DV2, diretor_nome: "Roberto Santos Lima",     cargo: "Diretor",            agencia_id: A_ANVISA, data_inicio: "2021-11-01", data_fim: "2025-10-31", status: "Ativo" as const },
-      { id: "demo-m-9", diretor_id: DV3, diretor_nome: "Cristiane Prado",         cargo: "Diretora",           agencia_id: A_ANVISA, data_inicio: "2022-05-01", data_fim: "2026-04-30", status: "Ativo" as const },
+    const now = new Date().toISOString().slice(0, 10);
+    const raw = [
+      { id: "demo-m-1", diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",       cargo: "Diretor-Presidente", agencia_id: A_ARTESP, data_inicio: "2023-06-15", data_fim: "2027-06-14" },
+      { id: "demo-m-2", diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               cargo: "Diretor",            agencia_id: A_ARTESP, data_inicio: "2021-03-10", data_fim: "2025-03-09" },
+      { id: "demo-m-3", diretor_id: DA3, diretor_nome: "Fernanda Esbízaro Rodrigues Rudnik", cargo: "Diretora",           agencia_id: A_ARTESP, data_inicio: "2022-07-22", data_fim: "2026-07-21" },
+      { id: "demo-m-4", diretor_id: DN1, diretor_nome: "Sandoval Feitosa Filho",  cargo: "Diretor-Geral",      agencia_id: A_ANEEL,  data_inicio: "2023-06-01", data_fim: "2027-05-31" },
+      { id: "demo-m-5", diretor_id: DN2, diretor_nome: "Maria Vitória Campos",    cargo: "Diretora",           agencia_id: A_ANEEL,  data_inicio: "2021-04-15", data_fim: "2025-04-14" },
+      { id: "demo-m-6", diretor_id: DN3, diretor_nome: "José Luís Schiffer",      cargo: "Diretor",            agencia_id: A_ANEEL,  data_inicio: "2022-02-01", data_fim: "2026-01-31" },
+      { id: "demo-m-7", diretor_id: DV1, diretor_nome: "Ana Beatriz Mendes",      cargo: "Diretora-Presidente",agencia_id: A_ANVISA, data_inicio: "2024-09-01", data_fim: "2028-08-31" },
+      { id: "demo-m-8", diretor_id: DV2, diretor_nome: "Roberto Santos Lima",     cargo: "Diretor",            agencia_id: A_ANVISA, data_inicio: "2021-11-01", data_fim: "2025-10-31" },
+      { id: "demo-m-9", diretor_id: DV3, diretor_nome: "Cristiane Prado",         cargo: "Diretora",           agencia_id: A_ANVISA, data_inicio: "2022-05-01", data_fim: "2026-04-30" },
     ];
+    return raw.map((m) => ({
+      ...m,
+      status: (!m.data_fim || m.data_fim >= now) ? "Ativo" as const : "Inativo" as const,
+    }));
   },
 
   // Aceita agencia_id para filtrar — retorna tudo se omitido
@@ -466,6 +471,132 @@ export const demoData = {
     return [...counts.entries()]
       .map(([microtema, count]) => ({ microtema, count }))
       .sort((a, b) => b.count - a.count);
+  },
+
+  diretorProfile(id: string) {
+    const diretor = this.diretores().find((d) => d.id === id);
+    if (!diretor) return null;
+
+    const mandato = this.mandatos().find((m) => m.diretor_id === id) ?? null;
+    const agencia = this.agencias().find((a) => a.id === diretor.agencia_id) ?? null;
+
+    // Compute vote history from all deliberations
+    const historico: Array<{
+      deliberacao_id: string; numero_deliberacao: string | null; data_reuniao: string | null;
+      interessado: string | null; microtema: string | null; resultado: string | null;
+      tipo_voto: string; is_divergente: boolean;
+    }> = [];
+    let favoravel = 0, desfavoravel = 0, abstencao = 0, divergente = 0;
+    const microtemaCount = new Map<string, number>();
+
+    for (const delib of DELIBERACOES_RAW) {
+      const votos = _buildVotos(delib);
+      const meuVoto = votos.find((v) => v.diretor_id === id);
+      if (!meuVoto) continue;
+
+      if (meuVoto.tipo_voto === "Favoravel") favoravel++;
+      else if (meuVoto.tipo_voto === "Desfavoravel") desfavoravel++;
+      else abstencao++;
+      if (meuVoto.is_divergente) divergente++;
+      if (delib.microtema) microtemaCount.set(delib.microtema, (microtemaCount.get(delib.microtema) ?? 0) + 1);
+
+      historico.push({
+        deliberacao_id: delib.id,
+        numero_deliberacao: delib.n,
+        data_reuniao: delib.data,
+        interessado: delib.interessado,
+        microtema: delib.microtema,
+        resultado: delib.resultado,
+        tipo_voto: meuVoto.tipo_voto,
+        is_divergente: meuVoto.is_divergente,
+      });
+    }
+    historico.sort((a, b) => (b.data_reuniao ?? "").localeCompare(a.data_reuniao ?? ""));
+
+    const total = favoravel + desfavoravel + abstencao;
+    const pct_favoravel = total > 0 ? (favoravel / total) * 100 : 0;
+    const pct_divergente = total > 0 ? (divergente / total) * 100 : 0;
+
+    const perfil: "Consensual" | "Moderadamente divergente" | "Divergente" =
+      pct_divergente < 5 ? "Consensual"
+      : pct_divergente < 15 ? "Moderadamente divergente"
+      : "Divergente";
+
+    const microtema_dominante = microtemaCount.size > 0
+      ? [...microtemaCount.entries()].sort((a, b) => b[1] - a[1])[0][0]
+      : null;
+
+    const taxa_aprovacao = total > 0 ? `${pct_favoravel.toFixed(1)}%` : "—";
+    const descricao = total > 0
+      ? (pct_divergente < 5
+          ? `Vota com a maioria em ${(100 - pct_divergente).toFixed(0)}% dos casos`
+          : `Apresentou voto divergente em ${pct_divergente.toFixed(1)}% das deliberações`)
+      : "Sem histórico de votos registrado";
+
+    let dias_restantes: number | null = null;
+    if (mandato?.data_fim && mandato.status === "Ativo") {
+      const fim = new Date(mandato.data_fim).getTime();
+      const hoje = Date.now();
+      dias_restantes = Math.max(0, Math.round((fim - hoje) / 86400000));
+    }
+
+    return {
+      id: diretor.id,
+      nome: diretor.nome,
+      cargo: diretor.cargo,
+      agencia_id: diretor.agencia_id,
+      agencia_sigla: agencia?.sigla ?? null,
+      mandato: {
+        data_inicio: mandato?.data_inicio ?? "",
+        data_fim: mandato?.data_fim ?? null,
+        status: mandato?.status ?? "Inativo",
+        dias_restantes,
+      },
+      stats: { total_votos: total, favoravel, desfavoravel, abstencao, divergente, pct_favoravel, pct_divergente },
+      por_microtema: [...microtemaCount.entries()]
+        .map(([microtema, t]) => ({ microtema, total: t }))
+        .sort((a, b) => b.total - a.total),
+      historico,
+      tendencias: { perfil, microtema_dominante, taxa_aprovacao, descricao },
+    };
+  },
+
+  mandatosAnalytics(agencia_id?: string | null) {
+    const rows = agencia_id ? DELIBERACOES_RAW.filter((d) => d.agencia === agencia_id) : DELIBERACOES_RAW;
+    const total = rows.length;
+
+    const comLitigio = rows.filter((d) => (d.divergentes ?? []).length > 0).length;
+    const taxa_litigio = total > 0 ? `${((comLitigio / total) * 100).toFixed(1)}%` : "0%";
+
+    const consenso = total - comLitigio;
+    const taxa_consenso = total > 0 ? `${((consenso / total) * 100).toFixed(1)}%` : "0%";
+
+    const sancao = rows.filter((d) => d.microtema === "multa" || d.resultado === "Indeferido").length;
+    const taxa_sancao = total > 0 ? `${((sancao / total) * 100).toFixed(1)}%` : "0%";
+
+    const resultadoCount = new Map<string, number>();
+    for (const d of rows) {
+      const r = d.resultado;
+      resultadoCount.set(r, (resultadoCount.get(r) ?? 0) + 1);
+    }
+    const distribuicao_decisao = [...resultadoCount.entries()]
+      .map(([resultado, count]) => ({ resultado, count, pct: total > 0 ? Math.round((count / total) * 100) : 0 }))
+      .sort((a, b) => b.count - a.count);
+
+    const byMonth = new Map<string, { total: number; deferido: number; indeferido: number }>();
+    for (const d of rows) {
+      const period = d.data.slice(0, 7);
+      if (!byMonth.has(period)) byMonth.set(period, { total: 0, deferido: 0, indeferido: 0 });
+      const s = byMonth.get(period)!;
+      s.total++;
+      if (d.resultado === "Deferido") s.deferido++;
+      else if (d.resultado === "Indeferido") s.indeferido++;
+    }
+    const evolucao_mensal = [...byMonth.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([period, s]) => ({ period, ...s }));
+
+    return { total_deliberacoes: total, taxa_litigio, taxa_consenso, taxa_sancao, distribuicao_decisao, evolucao_mensal };
   },
 
   uploadDemo(filenames: string[]) {

@@ -174,6 +174,68 @@ export interface VotoDistribution {
   pct: string;
 }
 
+// ─── Perfil de Diretor ────────────────────────────────────────────────────
+
+export interface DiretorProfile {
+  id: string;
+  nome: string;
+  cargo: string | null;
+  agencia_id: string | null;
+  agencia_sigla: string | null;
+  mandato: {
+    data_inicio: string;
+    data_fim: string | null;
+    status: "Ativo" | "Inativo";
+    dias_restantes: number | null;
+  };
+  stats: {
+    total_votos: number;
+    favoravel: number;
+    desfavoravel: number;
+    abstencao: number;
+    divergente: number;
+    pct_favoravel: number;
+    pct_divergente: number;
+  };
+  por_microtema: Array<{ microtema: string; total: number }>;
+  historico: Array<{
+    deliberacao_id: string;
+    numero_deliberacao: string | null;
+    data_reuniao: string | null;
+    interessado: string | null;
+    microtema: string | null;
+    resultado: string | null;
+    tipo_voto: string;
+    is_divergente: boolean;
+  }>;
+  tendencias: {
+    perfil: "Consensual" | "Moderadamente divergente" | "Divergente";
+    microtema_dominante: string | null;
+    taxa_aprovacao: string;
+    descricao: string;
+  };
+}
+
+export interface DecisaoTipo {
+  resultado: string;
+  count: number;
+  pct: number;
+}
+
+export interface MandatosAnalytics {
+  total_deliberacoes: number;
+  taxa_litigio: string;
+  taxa_consenso: string;
+  taxa_sancao: string;
+  distribuicao_decisao: DecisaoTipo[];
+  evolucao_mensal: Array<{
+    period: string;
+    total: number;
+    deferido: number;
+    indeferido: number;
+  }>;
+}
+
 export interface DiretorOverviewItem {
   diretor_id: string;
   diretor_nome: string;
