@@ -168,3 +168,64 @@ export interface DiretorOverviewItem {
   divergente: number;
   pct_favor: number;
 }
+
+// ─── Upload Preview / Confirm ─────────────────────────────────────────────
+
+export interface PreviewResultFields {
+  numero_deliberacao: string | null;
+  reuniao_ordinaria: string | null;
+  data_reuniao: string | null;
+  interessado: string | null;
+  assunto: string | null;
+  processo: string | null;
+  resultado: string | null;
+  microtema: string;
+  pauta_interna: boolean;
+  resumo_pleito: string | null;
+  fundamento_decisao: string | null;
+  nomes_votacao: string[];
+}
+
+export interface PreviewResult {
+  filename: string;
+  status: "ok" | "low_confidence" | "error";
+  error?: string;
+  fields: PreviewResultFields;
+  confidence: number;
+  page_count: number;
+  chars_per_page: number;
+}
+
+export interface BatchPreviewResponse {
+  results: PreviewResult[];
+}
+
+export interface ConfirmDelib {
+  filename: string;
+  numero_deliberacao: string | null;
+  reuniao_ordinaria: string | null;
+  data_reuniao: string | null;
+  interessado: string | null;
+  assunto: string | null;
+  processo: string | null;
+  resultado: string | null;
+  microtema: string | null;
+  pauta_interna: boolean;
+  resumo_pleito: string | null;
+  fundamento_decisao: string | null;
+  nomes_votacao: string[];
+  extraction_confidence: number;
+}
+
+export interface ConfirmResult {
+  filename: string;
+  status: "created" | "error";
+  deliberacao_id?: string;
+  error?: string;
+}
+
+export interface BatchConfirmResponse {
+  created: number;
+  errors: number;
+  results: ConfirmResult[];
+}

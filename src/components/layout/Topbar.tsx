@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Search, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const ROUTE_LABELS: Record<string, string> = {
   "/dashboard": "Overview",
@@ -64,6 +65,9 @@ export function Topbar() {
         >
           <Bell className="w-4 h-4 text-text-secondary" />
         </button>
+
+        {/* Tema claro/escuro */}
+        <ThemeToggle />
       </div>
     </header>
   );

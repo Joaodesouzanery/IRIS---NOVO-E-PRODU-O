@@ -5,218 +5,804 @@ import { useDropzone } from "react-dropzone";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { Agencia, BatchUploadResponse, JobStatus, UploadJobResult } from "@/types";
+import type {
+  Agencia,
+  PreviewResult,
+  PreviewResultFields,
+  BatchPreviewResponse,
+  BatchConfirmResponse,
+  ConfirmDelib,
+} from "@/types";
 import {
-  Upload, FileText, CheckCircle, XCircle, Clock,
-  AlertTriangle, RefreshCw, Loader2, Copy,
+  Upload, FileText, CheckCircle, XCircle, Loader2,
+  AlertTriangle, ChevronDown, ChevronRight, Trash2, RefreshCw,
 } from "lucide-react";
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; spin?: boolean }> = {
-  pending: { label: "Na fila", color: "text-text-muted" },
-  processing: { label: "Processando", color: "text-brand", spin: true },
-  done: { label: "Concluído", color: "text-success" },
-  failed: { label: "Falhou", color: "text-error" },
-  retry: { label: "Tentando novamente", color: "text-warning", spin: true },
-  done_with_warnings: { label: "Concluído c/ avisos", color: "text-warning" },
-  queued: { label: "Na fila", color: "text-text-muted" },
-  duplicate: { label: "Duplicado", color: "text-text-label" },
-  rejected: { label: "Rejeitado", color: "text-error" },
-  error: { label: "Erro", color: "text-error" },
-};
+// ─── Constantes ─────────────────────────────────────────────────────────────
 
-function JobRow({ result }: { result: UploadJobResult }) {
-  const { data: jobStatus } = useQuery({
-    queryKey: ["job", result.job_id],
-    queryFn: () => api.get<JobStatus>(`/upload/jobs/${result.job_id}`),
-    enabled: !!result.job_id && result.status === "queued",
-    refetchInterval: (query) => {
-      const s = query.state.data?.status;
-      if (!s) return 3000;
-      return ["done", "failed", "done_with_warnings"].includes(s) ? false : 3000;
-    },
-  });
+const RESULTADOS = [
+  "Deferido", "Indeferido", "Parcialmente Deferido", "Retirado de Pauta",
+  "Ratificado", "Aprovado", "Aprovado com Ressalvas", "Aprovado por Unanimidade",
+  "Recomendado", "Determinado", "Autorizado",
+] as const;
 
-  const liveStatus = jobStatus?.status ?? result.status;
-  const cfg = STATUS_CONFIG[liveStatus] ?? STATUS_CONFIG.pending;
+const MICROTEMAS = [
+  "tarifa", "obras", "multa", "contrato", "reequilibrio",
+  "fiscalizacao", "seguranca", "ambiental", "desapropriacao",
+  "adimplencia", "pessoal", "usuario", "outros",
+] as const;
 
+// ─── Tipos locais ────────────────────────────────────────────────────────────
+
+type Stage = "queue" | "analyzing" | "review" | "confirming" | "done";
+
+interface QueuedFile {
+  id: string;
+  file: File;
+  status: "pending" | "analyzing" | "done" | "error";
+}
+
+interface ReviewItem extends PreviewResult {
+  id: string;
+  rejected: boolean;
+  edited: Partial<PreviewResultFields>;
+}
+
+// ─── Utilitários ─────────────────────────────────────────────────────────────
+
+function confidenceColor(c: number) {
+  if (c >= 0.8) return "text-success bg-success/10";
+  if (c >= 0.5) return "text-warning bg-warning/10";
+  return "text-error bg-error/10";
+}
+
+function confidenceLabel(c: number) {
+  if (c >= 0.8) return "Alta confiança";
+  if (c >= 0.5) return "Média confiança";
+  return "Baixa confiança";
+}
+
+function fmt(n: number) {
+  return Math.round(n * 100) + "%";
+}
+
+function fmtSize(bytes: number) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / 1024 / 1024).toFixed(1) + " MB";
+}
+
+// ─── Componente: linha de arquivo na fila ─────────────────────────────────
+
+function QueueRow({
+  qf,
+  onRemove,
+}: {
+  qf: QueuedFile;
+  onRemove: (id: string) => void;
+}) {
   return (
-    <div className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-bg-hover transition-colors">
-      {cfg.spin ? (
-        <Loader2 className={cn("w-4 h-4 shrink-0 animate-spin", cfg.color)} />
-      ) : liveStatus === "done" ? (
+    <div className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-bg-hover transition-colors group">
+      {qf.status === "analyzing" ? (
+        <Loader2 className="w-4 h-4 shrink-0 text-brand animate-spin" />
+      ) : qf.status === "done" ? (
         <CheckCircle className="w-4 h-4 shrink-0 text-success" />
-      ) : liveStatus === "failed" || liveStatus === "rejected" || liveStatus === "error" ? (
+      ) : qf.status === "error" ? (
         <XCircle className="w-4 h-4 shrink-0 text-error" />
-      ) : liveStatus === "done_with_warnings" ? (
-        <AlertTriangle className="w-4 h-4 shrink-0 text-warning" />
-      ) : liveStatus === "duplicate" ? (
-        <Copy className="w-4 h-4 shrink-0 text-text-muted" />
       ) : (
-        <Clock className="w-4 h-4 shrink-0 text-text-muted" />
+        <FileText className="w-4 h-4 shrink-0 text-text-label" />
       )}
-      <span className="flex-1 text-sm text-text-secondary truncate">{result.filename}</span>
-      <span className={cn("text-xs font-mono shrink-0", cfg.color)}>{cfg.label}</span>
-      {(result.message ?? jobStatus?.error_message) && (
-        <span
-          className="text-xs text-error truncate max-w-[200px]"
-          title={result.message ?? jobStatus?.error_message ?? ""}
+      <span className="flex-1 text-sm text-text-secondary truncate">{qf.file.name}</span>
+      <span className="text-xs text-text-label font-mono shrink-0">{fmtSize(qf.file.size)}</span>
+      {qf.status === "pending" && (
+        <button
+          onClick={() => onRemove(qf.id)}
+          className="w-6 h-6 flex items-center justify-center rounded text-text-label
+                     hover:text-error hover:bg-error/10 opacity-0 group-hover:opacity-100 transition-all"
+          aria-label={`Remover ${qf.file.name}`}
         >
-          {result.message ?? jobStatus?.error_message}
-        </span>
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
       )}
     </div>
   );
 }
 
+// ─── Componente: card de revisão por arquivo ──────────────────────────────
+
+function ReviewCard({
+  item,
+  onUpdate,
+  onReject,
+}: {
+  item: ReviewItem;
+  onUpdate: (id: string, patch: Partial<PreviewResultFields>) => void;
+  onReject: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(!item.rejected && item.status !== "ok");
+  const fields: PreviewResultFields = { ...item.fields, ...item.edited };
+
+  function field<K extends keyof PreviewResultFields>(k: K) {
+    return fields[k];
+  }
+
+  function set<K extends keyof PreviewResultFields>(k: K, v: PreviewResultFields[K]) {
+    onUpdate(item.id, { [k]: v } as Partial<PreviewResultFields>);
+  }
+
+  const conf = item.confidence;
+
+  return (
+    <div
+      className={cn(
+        "border rounded-card transition-all",
+        item.rejected
+          ? "border-border opacity-50"
+          : "border-border hover:border-brand/30"
+      )}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none"
+        onClick={() => setOpen((o) => !o)}
+      >
+        {open ? (
+          <ChevronDown className="w-4 h-4 shrink-0 text-text-label" />
+        ) : (
+          <ChevronRight className="w-4 h-4 shrink-0 text-text-label" />
+        )}
+
+        <FileText className="w-4 h-4 shrink-0 text-text-label" />
+        <span className="flex-1 text-sm text-text-primary font-medium truncate">
+          {item.filename}
+        </span>
+
+        {/* Badge de confiança */}
+        <span className={cn("badge text-xs font-mono px-2 py-0.5", confidenceColor(conf))}>
+          {fmt(conf)} · {confidenceLabel(conf)}
+        </span>
+
+        {/* Resultado resumido */}
+        {field("resultado") && (
+          <span className="badge badge-gray text-xs">{field("resultado")}</span>
+        )}
+
+        {/* Botão rejeitar */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onReject(item.id);
+          }}
+          className={cn(
+            "ml-2 px-2 py-1 rounded text-xs font-medium transition-colors",
+            item.rejected
+              ? "bg-bg-hover text-text-secondary hover:text-text-primary"
+              : "text-error hover:bg-error/10"
+          )}
+        >
+          {item.rejected ? "Restaurar" : "Rejeitar"}
+        </button>
+      </div>
+
+      {/* Formulário expandido */}
+      {open && !item.rejected && (
+        <div className="px-4 pb-4 border-t border-border space-y-4 pt-4">
+          {item.status === "error" && item.error && (
+            <div className="flex items-start gap-2 p-3 rounded-md bg-error/10 border border-error/20 text-sm text-error">
+              <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              {item.error}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs text-text-label font-mono uppercase tracking-wider">
+                Nº Deliberação
+              </label>
+              <input
+                className="input"
+                value={field("numero_deliberacao") ?? ""}
+                onChange={(e) => set("numero_deliberacao", e.target.value || null)}
+                placeholder="ex: 02"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-text-label font-mono uppercase tracking-wider">
+                Reunião
+              </label>
+              <input
+                className="input"
+                value={field("reuniao_ordinaria") ?? ""}
+                onChange={(e) => set("reuniao_ordinaria", e.target.value || null)}
+                placeholder="ex: 230ª Reunião Extraordinária"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-text-label font-mono uppercase tracking-wider">
+                Data da Reunião
+              </label>
+              <input
+                type="date"
+                className="input"
+                value={field("data_reuniao") ?? ""}
+                onChange={(e) => set("data_reuniao", e.target.value || null)}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-text-label font-mono uppercase tracking-wider">
+                Processo
+              </label>
+              <input
+                className="input"
+                value={field("processo") ?? ""}
+                onChange={(e) => set("processo", e.target.value || null)}
+                placeholder="ex: SEI! nº 001.0036/2024-51"
+              />
+            </div>
+
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-xs text-text-label font-mono uppercase tracking-wider">
+                Interessado
+              </label>
+              <input
+                className="input"
+                value={field("interessado") ?? ""}
+                onChange={(e) => set("interessado", e.target.value || null)}
+                placeholder="ex: Empresa XYZ Ltda."
+              />
+            </div>
+
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-xs text-text-label font-mono uppercase tracking-wider">
+                Assunto
+              </label>
+              <input
+                className="input"
+                value={field("assunto") ?? ""}
+                onChange={(e) => set("assunto", e.target.value || null)}
+                placeholder="ex: Ratificação de Termo Aditivo..."
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-text-label font-mono uppercase tracking-wider">
+                Resultado
+              </label>
+              <select
+                className="input"
+                value={field("resultado") ?? ""}
+                onChange={(e) =>
+                  set("resultado", (e.target.value as PreviewResultFields["resultado"]) || null)
+                }
+              >
+                <option value="">— não classificado —</option>
+                {RESULTADOS.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-text-label font-mono uppercase tracking-wider">
+                Microtema
+              </label>
+              <select
+                className="input"
+                value={field("microtema")}
+                onChange={(e) => set("microtema", e.target.value)}
+              >
+                {MICROTEMAS.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-text-label font-mono uppercase tracking-wider">
+                Pauta Interna
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer mt-2">
+                <input
+                  type="checkbox"
+                  checked={field("pauta_interna")}
+                  onChange={(e) => set("pauta_interna", e.target.checked)}
+                  className="w-4 h-4 accent-brand"
+                />
+                <span className="text-sm text-text-secondary">
+                  Marcar como pauta interna/administrativa
+                </span>
+              </label>
+            </div>
+          </div>
+
+          {/* Campos somente leitura */}
+          <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border">
+            <div>
+              <p className="text-xs text-text-label font-mono uppercase tracking-wider mb-1">
+                Páginas
+              </p>
+              <p className="text-sm text-text-secondary font-mono">
+                {item.page_count > 0 ? item.page_count : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-text-label font-mono uppercase tracking-wider mb-1">
+                Chars/pág
+              </p>
+              <p className="text-sm text-text-secondary font-mono">
+                {item.chars_per_page > 0 ? item.chars_per_page.toLocaleString("pt-BR") : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-text-label font-mono uppercase tracking-wider mb-1">
+                Confiança IA
+              </p>
+              <p className={cn("text-sm font-mono font-medium", confidenceColor(conf))}>
+                {fmt(conf)}
+              </p>
+            </div>
+          </div>
+
+          {/* Diretores detectados */}
+          {field("nomes_votacao").length > 0 && (
+            <div className="pt-2 border-t border-border">
+              <p className="text-xs text-text-label font-mono uppercase tracking-wider mb-2">
+                Diretores detectados
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {field("nomes_votacao").map((nome, i) => (
+                  <span key={i} className="badge badge-gray text-xs">{nome}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Página principal ─────────────────────────────────────────────────────
+
 export default function UploadPage() {
-  const [results, setResults] = useState<UploadJobResult[]>([]);
-  const [summary, setSummary] = useState<{ total: number; queued: number; rejected: number } | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [stage, setStage] = useState<Stage>("queue");
+  const [queue, setQueue] = useState<QueuedFile[]>([]);
   const [agenciaId, setAgenciaId] = useState<string>("");
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [confirmResults, setConfirmResults] = useState<BatchConfirmResponse | null>(null);
 
   const { data: agencias } = useQuery({
     queryKey: ["agencias"],
     queryFn: () => api.get<Agencia[]>("/agencias"),
   });
 
-  const onDrop = useCallback(
-    async (acceptedFiles: File[]) => {
-      if (!acceptedFiles.length) return;
-      if (!agenciaId) {
-        setUploadError("Selecione uma agência antes de enviar os PDFs.");
-        return;
-      }
-
-      setUploading(true);
-      setUploadError(null);
-      setResults([]);
-      setSummary(null);
-
-      try {
-        const formData = new FormData();
-        formData.append("agencia_id", agenciaId);
-        acceptedFiles.forEach((file) => formData.append("files", file));
-
-        const response = await api.upload<BatchUploadResponse>("/upload/batch", formData);
-        setResults(response.results);
-        setSummary({ total: response.total, queued: response.queued, rejected: response.rejected });
-      } catch (err: any) {
-        setUploadError(err.message ?? "Erro ao enviar arquivos");
-      } finally {
-        setUploading(false);
-      }
-    },
-    [agenciaId]
-  );
+  // ── Etapa 1: Dropzone → fila ─────────────────────────────────────────
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    if (!acceptedFiles.length) return;
+    setQueue((prev) => [
+      ...prev,
+      ...acceptedFiles.map((file) => ({
+        id: crypto.randomUUID(),
+        file,
+        status: "pending" as const,
+      })),
+    ]);
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { "application/pdf": [".pdf"] },
     maxFiles: 1000,
     maxSize: 52_428_800,
-    disabled: uploading,
+    disabled: stage !== "queue",
   });
+
+  function removeFromQueue(id: string) {
+    setQueue((prev) => prev.filter((f) => f.id !== id));
+  }
+
+  function resetAll() {
+    setStage("queue");
+    setQueue([]);
+    setAgenciaId("");
+    setReviewItems([]);
+    setAnalyzeError(null);
+    setConfirmResults(null);
+  }
+
+  // ── Etapa 2: Análise ─────────────────────────────────────────────────
+  async function handleAnalyze() {
+    if (!queue.length) return;
+    setStage("analyzing");
+    setAnalyzeError(null);
+
+    // Marca todos como "analyzing"
+    setQueue((prev) => prev.map((f) => ({ ...f, status: "analyzing" })));
+
+    try {
+      const formData = new FormData();
+      queue.forEach((qf) => formData.append("files", qf.file));
+      if (agenciaId) formData.append("agencia_id", agenciaId);
+
+      const res = await api.upload<BatchPreviewResponse>("/upload/preview", formData);
+
+      // Mapeia resultados
+      const items: ReviewItem[] = res.results.map((r, i) => ({
+        ...r,
+        id: queue[i]?.id ?? crypto.randomUUID(),
+        rejected: false,
+        edited: {},
+      }));
+
+      // Marca arquivos na fila
+      setQueue((prev) =>
+        prev.map((f, i) => ({
+          ...f,
+          status: res.results[i]?.status === "error" ? "error" : "done",
+        }))
+      );
+
+      setReviewItems(items);
+      setStage("review");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao analisar PDFs";
+      setAnalyzeError(msg);
+      setQueue((prev) => prev.map((f) => ({ ...f, status: "error" })));
+      setStage("queue");
+    }
+  }
+
+  // ── Etapa 3: Revisão ─────────────────────────────────────────────────
+  function updateReviewItem(id: string, patch: Partial<PreviewResultFields>) {
+    setReviewItems((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, edited: { ...item.edited, ...patch } } : item
+      )
+    );
+  }
+
+  function toggleReject(id: string) {
+    setReviewItems((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, rejected: !item.rejected } : item
+      )
+    );
+  }
+
+  const activeItems = reviewItems.filter((r) => !r.rejected && r.status !== "error");
+
+  // ── Etapa 4: Confirmar ───────────────────────────────────────────────
+  async function handleConfirm() {
+    if (!activeItems.length) return;
+    setStage("confirming");
+
+    const deliberacoes: ConfirmDelib[] = activeItems.map((item) => {
+      const fields: PreviewResultFields = { ...item.fields, ...item.edited };
+      return {
+        filename: item.filename,
+        numero_deliberacao: fields.numero_deliberacao,
+        reuniao_ordinaria: fields.reuniao_ordinaria,
+        data_reuniao: fields.data_reuniao,
+        interessado: fields.interessado,
+        assunto: fields.assunto,
+        processo: fields.processo,
+        resultado: fields.resultado,
+        microtema: fields.microtema,
+        pauta_interna: fields.pauta_interna,
+        resumo_pleito: fields.resumo_pleito,
+        fundamento_decisao: fields.fundamento_decisao,
+        nomes_votacao: fields.nomes_votacao,
+        extraction_confidence: item.confidence,
+      };
+    });
+
+    try {
+      const res = await api.post<BatchConfirmResponse>("/upload/confirm", {
+        agencia_id: agenciaId,
+        deliberacoes,
+      });
+      setConfirmResults(res);
+      setStage("done");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao confirmar deliberações";
+      setAnalyzeError(msg);
+      setStage("review");
+    }
+  }
+
+  // ── Renders por etapa ─────────────────────────────────────────────────
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-xl font-semibold text-text-primary">Upload de PDFs</h1>
-        <p className="text-sm text-text-muted mt-1">
-          Envie até 1.000 PDFs por lote. Os arquivos são processados em fila automaticamente.
-        </p>
-      </div>
-
-      {/* Seletor de agência */}
-      <div className="card space-y-2">
-        <label className="text-xs text-text-muted font-mono uppercase tracking-wider">
-          Agência Reguladora *
-        </label>
-        <select
-          className="input w-full"
-          value={agenciaId}
-          onChange={(e) => setAgenciaId(e.target.value)}
-        >
-          <option value="">Selecione a agência...</option>
-          {(agencias ?? []).map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.sigla} — {a.nome}
-            </option>
-          ))}
-        </select>
-        {(agencias ?? []).length === 0 && (
-          <p className="text-xs text-text-label">
-            Nenhuma agência cadastrada.{" "}
-            <a href="/dashboard/agencias" className="text-brand underline">
-              Cadastre uma primeiro.
-            </a>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-text-primary">Upload de PDFs</h1>
+          <p className="text-sm text-text-muted mt-1">
+            Arraste os PDFs → analise com IA → revise os campos → confirme no sistema.
           </p>
-        )}
-      </div>
-
-      {/* Dropzone */}
-      <div
-        {...getRootProps()}
-        className={cn(
-          "border-2 border-dashed rounded-card p-12 text-center transition-all duration-200 cursor-pointer",
-          isDragActive ? "border-brand bg-brand/5" : "border-border hover:border-brand/40 hover:bg-bg-card",
-          uploading && "opacity-60 cursor-not-allowed"
-        )}
-      >
-        <input {...getInputProps()} />
-        <Upload className={cn("w-10 h-10 mx-auto mb-4", isDragActive ? "text-brand" : "text-text-label")} />
-        {isDragActive ? (
-          <p className="text-brand font-medium">Solte os PDFs aqui</p>
-        ) : uploading ? (
-          <div className="flex items-center justify-center gap-2 text-text-secondary">
-            <Loader2 className="w-4 h-4 animate-spin text-brand" />
-            <span>Enviando arquivos...</span>
-          </div>
-        ) : (
-          <>
-            <p className="text-text-primary font-medium">
-              Arraste PDFs aqui ou{" "}
-              <span className="text-brand underline">clique para selecionar</span>
-            </p>
-            <p className="text-xs text-text-muted mt-2">
-              Apenas .pdf • Máx. 50 MB por arquivo • Até 1.000 arquivos por lote
-            </p>
-          </>
-        )}
-      </div>
-
-      {/* Erro */}
-      {uploadError && (
-        <div className="flex items-start gap-3 p-4 rounded-md bg-error/10 border border-error/20">
-          <XCircle className="w-4 h-4 text-error shrink-0 mt-0.5" />
-          <p className="text-sm text-error">{uploadError}</p>
         </div>
+
+        {/* Indicador de etapa */}
+        <div className="flex items-center gap-2 text-xs font-mono text-text-label">
+          {(["queue", "review", "done"] as Stage[]).map((s, i) => (
+            <span key={s} className="flex items-center gap-2">
+              {i > 0 && <span>›</span>}
+              <span
+                className={cn(
+                  "px-2 py-0.5 rounded-full",
+                  stage === s
+                    ? "bg-brand/15 text-brand"
+                    : (stage === "analyzing" && s === "queue") ||
+                      (stage === "confirming" && s === "review") ||
+                      (stage === "done" && (s === "queue" || s === "review"))
+                    ? "text-text-secondary"
+                    : "text-text-label"
+                )}
+              >
+                {s === "queue" ? "1 Fila" : s === "review" ? "2 Revisão" : "3 Concluído"}
+              </span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* ── ETAPA 1 + 2: Fila e Análise ──────────────────────────────────── */}
+      {(stage === "queue" || stage === "analyzing") && (
+        <>
+          {/* Seletor de agência */}
+          <div className="card space-y-2">
+            <label className="text-xs text-text-muted font-mono uppercase tracking-wider">
+              Agência Reguladora
+            </label>
+            <select
+              className="input w-full"
+              value={agenciaId}
+              onChange={(e) => setAgenciaId(e.target.value)}
+              disabled={stage === "analyzing"}
+            >
+              <option value="">Selecione a agência... (opcional em modo demo)</option>
+              {(agencias ?? []).map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.sigla} — {a.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Dropzone */}
+          <div
+            {...getRootProps()}
+            className={cn(
+              "border-2 border-dashed rounded-card p-12 text-center transition-all duration-200 cursor-pointer",
+              isDragActive
+                ? "border-brand bg-brand/5"
+                : "border-border hover:border-brand/40 hover:bg-bg-card",
+              stage === "analyzing" && "opacity-60 cursor-not-allowed"
+            )}
+          >
+            <input {...getInputProps()} />
+            <Upload
+              className={cn("w-10 h-10 mx-auto mb-4", isDragActive ? "text-brand" : "text-text-label")}
+            />
+            {isDragActive ? (
+              <p className="text-brand font-medium">Solte os PDFs aqui</p>
+            ) : stage === "analyzing" ? (
+              <div className="flex items-center justify-center gap-2 text-text-secondary">
+                <Loader2 className="w-4 h-4 animate-spin text-brand" />
+                <span>Analisando arquivos...</span>
+              </div>
+            ) : (
+              <>
+                <p className="text-text-primary font-medium">
+                  Arraste PDFs aqui ou{" "}
+                  <span className="text-brand underline">clique para selecionar</span>
+                </p>
+                <p className="text-xs text-text-muted mt-2">
+                  Apenas .pdf · Máx. 50 MB por arquivo · Até 1.000 arquivos por lote
+                </p>
+              </>
+            )}
+          </div>
+
+          {/* Erro de análise */}
+          {analyzeError && (
+            <div className="flex items-start gap-3 p-4 rounded-md bg-error/10 border border-error/20">
+              <XCircle className="w-4 h-4 text-error shrink-0 mt-0.5" />
+              <p className="text-sm text-error">{analyzeError}</p>
+            </div>
+          )}
+
+          {/* Lista da fila */}
+          {queue.length > 0 && (
+            <div className="card space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="section-label">Na fila — {queue.length} arquivo{queue.length !== 1 ? "s" : ""}</p>
+                {stage === "queue" && (
+                  <button
+                    onClick={() => setQueue([])}
+                    className="text-xs text-text-label hover:text-text-secondary transition-colors"
+                  >
+                    Limpar tudo
+                  </button>
+                )}
+              </div>
+              <div className="space-y-0.5 max-h-64 overflow-y-auto">
+                {queue.map((qf) => (
+                  <QueueRow key={qf.id} qf={qf} onRemove={removeFromQueue} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Botão Analisar */}
+          {queue.length > 0 && stage === "queue" && (
+            <div className="flex justify-end">
+              <button
+                onClick={handleAnalyze}
+                className="btn-primary"
+              >
+                {stage === "queue" ? (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    Analisar {queue.length} PDF{queue.length !== 1 ? "s" : ""}
+                  </>
+                ) : (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Analisando...
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Resultado do lote */}
-      {summary && (
-        <div className="card space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="section-label">Resultado do Envio</p>
-            <div className="flex gap-4 text-xs font-mono">
-              <span className="text-text-secondary">
-                Total: <strong className="text-text-primary">{summary.total}</strong>
-              </span>
-              <span className="text-success">
-                Na fila: <strong>{summary.queued}</strong>
-              </span>
-              {summary.rejected > 0 && (
-                <span className="text-error">
-                  Rejeitados: <strong>{summary.rejected}</strong>
-                </span>
+      {/* ── ETAPA 3: Revisão ──────────────────────────────────────────────── */}
+      {(stage === "review" || stage === "confirming") && (
+        <>
+          {/* Banner de resumo */}
+          <div className="card">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <p className="text-sm text-text-primary font-medium">
+                  {reviewItems.length} arquivo{reviewItems.length !== 1 ? "s" : ""} analisado{reviewItems.length !== 1 ? "s" : ""}
+                </p>
+                <p className="text-xs text-text-muted mt-0.5">
+                  {reviewItems.filter((r) => r.confidence >= 0.8).length} alta confiança ·{" "}
+                  {reviewItems.filter((r) => r.confidence >= 0.5 && r.confidence < 0.8).length} média ·{" "}
+                  {reviewItems.filter((r) => r.confidence < 0.5 && r.status !== "error").length} baixa ·{" "}
+                  {reviewItems.filter((r) => r.status === "error").length} com erro
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={resetAll}
+                  className="btn-secondary text-xs"
+                  disabled={stage === "confirming"}
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Novo Upload
+                </button>
+                <button
+                  onClick={handleConfirm}
+                  disabled={activeItems.length === 0 || stage === "confirming"}
+                  className="btn-primary"
+                >
+                  {stage === "confirming" ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Confirmando...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      Confirmar {activeItems.length} deliberaç{activeItems.length !== 1 ? "ões" : "ão"}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {analyzeError && (
+            <div className="flex items-start gap-3 p-4 rounded-md bg-error/10 border border-error/20">
+              <XCircle className="w-4 h-4 text-error shrink-0 mt-0.5" />
+              <p className="text-sm text-error">{analyzeError}</p>
+            </div>
+          )}
+
+          {/* Cards de revisão */}
+          <div className="space-y-3">
+            {reviewItems.map((item) => (
+              <ReviewCard
+                key={item.id}
+                item={item}
+                onUpdate={updateReviewItem}
+                onReject={toggleReject}
+              />
+            ))}
+          </div>
+
+          {/* Rodapé sticky com botão confirmar */}
+          {activeItems.length > 0 && (
+            <div className="sticky bottom-4 flex justify-end pt-4">
+              <button
+                onClick={handleConfirm}
+                disabled={stage === "confirming"}
+                className="btn-primary shadow-lg"
+              >
+                {stage === "confirming" ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Confirmando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    Confirmar {activeItems.length} deliberaç{activeItems.length !== 1 ? "ões" : "ão"} →
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── ETAPA 4: Concluído ─────────────────────────────────────────────── */}
+      {stage === "done" && confirmResults && (
+        <div className="card space-y-5">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="w-6 h-6 text-success" />
+            <div>
+              <p className="text-text-primary font-semibold">
+                {confirmResults.created} deliberaç{confirmResults.created !== 1 ? "ões criadas" : "ão criada"}
+              </p>
+              {confirmResults.errors > 0 && (
+                <p className="text-xs text-error mt-0.5">
+                  {confirmResults.errors} falha{confirmResults.errors !== 1 ? "s" : ""} — veja abaixo
+                </p>
               )}
             </div>
           </div>
 
-          <div className="space-y-1 max-h-96 overflow-y-auto">
-            {results.map((r, i) => (
-              <JobRow key={r.job_id ?? i} result={r} />
+          <div className="space-y-1.5 max-h-96 overflow-y-auto">
+            {confirmResults.results.map((r, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-bg-hover transition-colors"
+              >
+                {r.status === "created" ? (
+                  <CheckCircle className="w-4 h-4 shrink-0 text-success" />
+                ) : (
+                  <XCircle className="w-4 h-4 shrink-0 text-error" />
+                )}
+                <span className="flex-1 text-sm text-text-secondary truncate">{r.filename}</span>
+                {r.status === "created" && r.deliberacao_id ? (
+                  <a
+                    href={`/dashboard/deliberacoes/${r.deliberacao_id}`}
+                    className="text-xs text-brand hover:underline font-mono shrink-0"
+                  >
+                    Ver deliberação →
+                  </a>
+                ) : r.error ? (
+                  <span className="text-xs text-error truncate max-w-[200px]" title={r.error}>
+                    {r.error}
+                  </span>
+                ) : null}
+              </div>
             ))}
+          </div>
+
+          <div className="flex justify-end pt-2 border-t border-border">
+            <button onClick={resetAll} className="btn-primary">
+              <RefreshCw className="w-4 h-4" />
+              Novo Upload
+            </button>
           </div>
         </div>
       )}

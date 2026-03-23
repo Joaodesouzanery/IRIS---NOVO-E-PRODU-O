@@ -38,8 +38,9 @@ async function request<T>(
   });
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ detail: "Erro desconhecido" }));
-    throw new ApiError(res.status, body.detail ?? res.statusText);
+    const body = await res.json().catch(() => ({}));
+    const msg = body.error ?? body.detail ?? body.message ?? res.statusText;
+    throw new ApiError(res.status, msg);
   }
 
   return res.json() as Promise<T>;
@@ -68,8 +69,9 @@ export const api = {
       // Sem Content-Type — o browser define o boundary do multipart automaticamente
     });
     if (!res.ok) {
-      const body = await res.json().catch(() => ({ detail: "Erro no upload" }));
-      throw new ApiError(res.status, body.detail ?? res.statusText);
+      const body = await res.json().catch(() => ({}));
+      const msg = body.error ?? body.detail ?? body.message ?? res.statusText;
+      throw new ApiError(res.status, msg);
     }
     return res.json() as Promise<T>;
   },
