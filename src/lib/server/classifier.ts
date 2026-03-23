@@ -118,3 +118,26 @@ export function classifyPautaInterna(text: string): boolean {
   const textLower = text.toLowerCase();
   return PAUTA_INTERNA_KEYWORDS.some((kw) => textLower.includes(kw));
 }
+
+// ─── Detecção de agência reguladora no texto do PDF ───────────────────────
+// Conta ocorrências de cada sigla conhecida e retorna a mais frequente.
+// siglas: lista vinda da DB (produção) ou do modo demo.
+export function detectAgenciaSigla(text: string, siglas: string[]): string | null {
+  if (!text || siglas.length === 0) return null;
+  const upper = text.toUpperCase();
+  const scores = siglas
+    .map((s) => ({ sigla: s, count: countOccurrences(upper, s.toUpperCase()) }))
+    .filter((x) => x.count > 0)
+    .sort((a, b) => b.count - a.count);
+  return scores[0]?.sigla ?? null;
+}
+
+function countOccurrences(text: string, needle: string): number {
+  let count = 0;
+  let idx = 0;
+  while ((idx = text.indexOf(needle, idx)) !== -1) {
+    count++;
+    idx++; // avança para evitar loop infinito
+  }
+  return count;
+}

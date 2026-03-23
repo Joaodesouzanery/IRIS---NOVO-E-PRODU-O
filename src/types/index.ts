@@ -194,6 +194,11 @@ export interface PreviewResult {
   confidence: number;
   page_count: number;
   chars_per_page: number;
+  file_hash: string;
+  is_duplicate: boolean;
+  duplicate_job_id: string | null;
+  agencia_id_detected: string | null;
+  agencia_sigla_detected: string | null;
 }
 
 export interface BatchPreviewResponse {
