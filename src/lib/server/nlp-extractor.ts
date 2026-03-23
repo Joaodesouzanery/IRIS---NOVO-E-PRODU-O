@@ -136,13 +136,13 @@ export function extractFields(text: string): ExtractedFields {
     PAUTA_INTERNA_KEYWORDS.some((kw) => textLower.includes(kw));
 
   // Resumo do pleito: parágrafo após "Trata-se" ou "Resumo:" ou "Objeto:"
-  const RE_RESUMO = /(?:Trata-se[^.]*\.|Resumo[:\s]+|Objeto[:\s]+)(.{20,500}?)(?=\n\n|\n[A-Z]|$)/is;
+  const RE_RESUMO = /(?:Trata-se[^.]*\.|Resumo[:\s]+|Objeto[:\s]+)([\s\S]{20,500}?)(?=\n\n|\n[A-Z]|$)/i;
   const resumoMatch = RE_RESUMO.exec(text);
   const resumo_pleito = resumoMatch ? resumoMatch[1].trim() : null;
 
   // Fundamento da decisão: parágrafo após "Fundamento" ou "Considerando" ou "DECIDE"
   const RE_FUNDAMENTO =
-    /(?:Fundamento[:\s]+|Em face do exposto|DECIDE[:\s]+|Decide-se[:\s]+)(.{20,1000}?)(?=\n\n|\n[A-Z]{3}|$)/is;
+    /(?:Fundamento[:\s]+|Em face do exposto|DECIDE[:\s]+|Decide-se[:\s]+)([\s\S]{20,1000}?)(?=\n\n|\n[A-Z]{3}|$)/i;
   const fundMatch = RE_FUNDAMENTO.exec(text);
   const fundamento_decisao = fundMatch ? fundMatch[1].trim() : null;
 

@@ -57,7 +57,7 @@ export async function processPdf(jobId: string, agenciaId: string): Promise<void
       .select("id, nome")
       .eq("agencia_id", agenciaId);
 
-    const diretoresList = (diretores ?? []).map((d) => ({ id: d.id, nome: d.nome }));
+    const diretoresList = (diretores ?? []).map((d) => ({ id: d.id, nome: d.nome, nome_variantes: [] as string[] }));
 
     // Insere deliberação
     const { data: delib, error: deliberacaoErr } = await db
@@ -87,19 +87,19 @@ export async function processPdf(jobId: string, agenciaId: string): Promise<void
     }
 
     // Insere votos se houver nomes extraídos
-    if (fields.votantes && fields.votantes.length > 0) {
-      const votoRows = fields.votantes
+    if (fields.nomes_votacao && fields.nomes_votacao.length > 0) {
+      const votoRows = fields.nomes_votacao
         .map((nome: string) => {
           const match = findBestMatch(nome, diretoresList);
           return {
-            deliberacao_id: delib.id,
-            diretor_id: match?.id ?? null,
+            deliberacao_id: delib.id as string,
+            diretor_id: match?.diretorId ?? null,
             tipo_voto: "Favoravel" as const,
             is_divergente: false,
             is_nominal: true,
           };
         })
-        .filter((v) => v.diretor_id !== null);
+        .filter((v: { diretor_id: string | null }) => v.diretor_id !== null);
 
       if (votoRows.length > 0) {
         await db.from("votos").insert(votoRows);
