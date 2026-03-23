@@ -326,3 +326,32 @@ export interface BatchConfirmResponse {
   results: ConfirmResult[];
   deliberacoes?: Deliberacao[];
 }
+
+// ─── Boletim ──────────────────────────────────────────────────────────────
+
+export interface BoletimSchedule {
+  id: string;
+  frequencia: "semanal" | "quinzenal" | "mensal" | "personalizado";
+  dia_semana?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  dia_mes?: number;
+  proximo_envio: string;
+  destinatarios: string[];
+  secoes: string[];
+  agencia_id: string | null;
+  ativo: boolean;
+  criado_em: string;
+}
+
+// ─── Governança ───────────────────────────────────────────────────────────
+
+export interface GovernancaIndicadores {
+  agencia_id: string;
+  agencia_sigla: string;
+  score: number;
+  taxa_consenso: number;
+  taxa_deferimento: number;
+  qualidade_ia: number;
+  taxa_sancao: number;
+  cobertura_documental: number;
+  periodo: string;
+}

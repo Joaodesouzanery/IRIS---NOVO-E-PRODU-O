@@ -7,8 +7,18 @@ import type { DashboardOverview, MicrotemaStats, DiretorOverviewItem, Agencia } 
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { IrisBarChart } from "@/components/charts/IrisBarChart";
 import { IrisPieChart } from "@/components/charts/IrisPieChart";
-import { getMicrotemaLabel, formatNumber } from "@/lib/utils";
-import { FileText, CheckCircle, Tag, Cpu } from "lucide-react";
+import { IrisAreaChart } from "@/components/charts/IrisAreaChart";
+import { ChartWrapper } from "@/components/charts/ChartWrapper";
+import { getMicrotemaLabel, getMicrotemaColor, formatNumber, cn } from "@/lib/utils";
+import { FileText, CheckCircle, Tag, Cpu, TrendingUp, Users, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+
+interface ReunioesStats {
+  period: string;
+  total: number;
+  deferido: number;
+  indeferido: number;
+}
 
 export default function DashboardPage() {
   const [agenciaId, setAgenciaId] = useState<string>("");
@@ -35,12 +45,31 @@ export default function DashboardPage() {
     queryFn: () => api.get<DiretorOverviewItem[]>(`/dashboard/diretores/overview${agenciaParam}`),
   });
 
+  const { data: reunioes = [] } = useQuery({
+    queryKey: ["dashboard", "reunioes-stats", agenciaId],
+    queryFn: () => api.get<ReunioesStats[]>(`/dashboard/reunioes/stats${agenciaParam}`),
+  });
+
+  // ── Chart data ────────────────────────────────────────────────────────
   const microtemasBarData = (microtemas ?? []).map((m) => ({
     name: m.microtema,
     value: m.total,
   }));
 
-  // Distribuição de resultados
+  const microtemasPieData = (microtemas ?? [])
+    .filter((m) => m.total > 0)
+    .map((m) => ({
+      name: getMicrotemaLabel(m.microtema),
+      value: m.total,
+      color: getMicrotemaColor(m.microtema),
+    }));
+
+  const microtemasAreaData = reunioes.map((r) => ({
+    name: r.period.slice(5) + "/" + r.period.slice(2, 4),
+    deferido: r.deferido,
+    indeferido: r.indeferido,
+  }));
+
   const resultadosPieData = overview
     ? [
         { name: "Deferidos",     value: overview.deferidos,     color: "#22c55e" },
@@ -49,7 +78,6 @@ export default function DashboardPage() {
       ].filter((d) => d.value > 0)
     : [];
 
-  // Pauta interna vs externa
   const pautaPieData = overview
     ? [
         { name: "Pauta Externa",  value: overview.pauta_externa,       color: "#f97316" },
@@ -57,14 +85,18 @@ export default function DashboardPage() {
       ].filter((d) => d.value > 0)
     : [];
 
+  // ── Top setores (sorted by total) ──────────────────────────────────
+  const topSetores = [...(microtemas ?? [])].sort((a, b) => b.total - a.total).slice(0, 5);
+
+  // ── Diretores mais ativos ─────────────────────────────────────────
+  const diretoresAtivos = [...(diretores ?? [])].sort((a, b) => b.total - a.total).slice(0, 4);
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-text-primary">
-            Inteligência Regulatória
-          </h1>
+          <h1 className="text-2xl font-semibold text-text-primary">Inteligência Regulatória</h1>
           <p className="text-sm text-text-muted mt-1">
             Análise de deliberações de agências reguladoras brasileiras
           </p>
@@ -81,7 +113,7 @@ export default function DashboardPage() {
         </select>
       </div>
 
-      {/* SEÇÃO 1: Header KPIs */}
+      {/* KPIs */}
       <section>
         <p className="section-label mb-3">Visão Geral</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -115,28 +147,35 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* SEÇÃO 2: Métricas de Valor */}
+      {/* Métricas de Valor Regulatório */}
       <section>
         <p className="section-label mb-3">Métricas de Valor Regulatório</p>
         <div className="grid grid-cols-3 gap-4">
-
           {/* Distribuição de resultados */}
-          <div className="card">
-            <p className="section-label mb-2">Distribuição de Resultados</p>
-            <IrisPieChart data={resultadosPieData} height={160} innerRadius={45} />
-          </div>
+          <ChartWrapper
+            title="Distribuição de Resultados"
+            availableTypes={["pie", "bar"]}
+            defaultType="pie"
+          >
+            {(type) => type === "pie"
+              ? <IrisPieChart data={resultadosPieData} height={160} innerRadius={45} />
+              : <IrisBarChart data={resultadosPieData.map((d) => ({ name: d.name, value: d.value }))} height={160} />
+            }
+          </ChartWrapper>
 
           {/* Pauta Interna vs Externa */}
-          <div className="card">
-            <p className="section-label mb-2">Pauta Interna vs Externa</p>
-            {pautaPieData.length > 0 ? (
-              <IrisPieChart data={pautaPieData} height={160} innerRadius={45} />
-            ) : (
-              <div className="h-[160px] flex items-center justify-center text-text-muted text-sm">
-                Sem dados
-              </div>
-            )}
-          </div>
+          <ChartWrapper
+            title="Pauta Interna vs Externa"
+            availableTypes={["pie", "bar"]}
+            defaultType="pie"
+          >
+            {(type) => pautaPieData.length > 0
+              ? type === "pie"
+                ? <IrisPieChart data={pautaPieData} height={160} innerRadius={45} />
+                : <IrisBarChart data={pautaPieData.map((d) => ({ name: d.name, value: d.value }))} height={160} />
+              : <div className="h-[160px] flex items-center justify-center text-text-muted text-sm">Sem dados</div>
+            }
+          </ChartWrapper>
 
           {/* Votos por diretor */}
           <div className="card">
@@ -159,17 +198,36 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Deliberações por microtema */}
-          <div className="card col-span-2">
-            <p className="section-label mb-3">Deliberações por Microtema</p>
-            <IrisBarChart
-              data={microtemasBarData}
-              useMicrotemaColors
-              horizontal
-              height={200}
-              formatLabel={getMicrotemaLabel}
-            />
-          </div>
+          {/* Deliberações por microtema — 3 tipos */}
+          <ChartWrapper
+            title="Deliberações por Microtema"
+            availableTypes={["bar", "pie", "area"]}
+            defaultType="bar"
+            className="col-span-2"
+          >
+            {(type) => {
+              if (type === "pie") return <IrisPieChart data={microtemasPieData} height={200} showLegend />;
+              if (type === "area") return (
+                <IrisAreaChart
+                  data={microtemasAreaData}
+                  areas={[
+                    { key: "deferido",   color: "#22c55e", label: "Deferido" },
+                    { key: "indeferido", color: "#ef4444", label: "Indeferido" },
+                  ]}
+                  height={200}
+                />
+              );
+              return (
+                <IrisBarChart
+                  data={microtemasBarData}
+                  useMicrotemaColors
+                  horizontal
+                  height={200}
+                  formatLabel={getMicrotemaLabel}
+                />
+              );
+            }}
+          </ChartWrapper>
 
           {/* Confiança da IA */}
           <div className="card">
@@ -178,9 +236,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <span className="text-xs text-text-muted">Média de confiança</span>
                 <span className="font-mono text-brand font-medium">
-                  {overview?.avg_confidence
-                    ? `${(overview.avg_confidence * 100).toFixed(0)}%`
-                    : "—"}
+                  {overview?.avg_confidence ? `${(overview.avg_confidence * 100).toFixed(0)}%` : "—"}
                 </span>
               </div>
               <div className="w-full bg-bg-hover rounded-full h-1.5">
@@ -191,22 +247,169 @@ export default function DashboardPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-text-muted">Microtemas identificados</span>
-                <span className="font-mono text-sm text-brand font-medium">
-                  {microtemas?.length ?? "—"}
-                </span>
+                <span className="font-mono text-sm text-brand font-medium">{microtemas?.length ?? "—"}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-text-muted">Top microtema</span>
                 {overview?.top_microtema && (
-                  <span className="badge-orange text-xs">
-                    {getMicrotemaLabel(overview.top_microtema)}
-                  </span>
+                  <span className="badge-orange text-xs">{getMicrotemaLabel(overview.top_microtema)}</span>
                 )}
               </div>
             </div>
           </div>
         </div>
       </section>
+
+      {/* Inteligência em Destaque */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <p className="section-label">Inteligência em Destaque</p>
+          <Link href="/dashboard/analytics" className="text-xs text-brand hover:underline">
+            Ver análise completa →
+          </Link>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+
+          {/* Setores Mais Afetados */}
+          <div className="card">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle className="w-4 h-4 text-brand" />
+              <p className="text-sm font-medium text-text-secondary">Setores Mais Afetados</p>
+            </div>
+            {topSetores.length === 0 ? (
+              <p className="text-xs text-text-muted">Sem dados</p>
+            ) : (
+              <div className="space-y-2">
+                {topSetores.map((m, i) => {
+                  const pct = microtemas && microtemas.length > 0
+                    ? (m.total / microtemas.reduce((s, x) => s + x.total, 0)) * 100
+                    : 0;
+                  return (
+                    <div key={m.microtema}>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-xs text-text-secondary flex items-center gap-1">
+                          <span className="font-mono text-text-muted">#{i + 1}</span>
+                          {getMicrotemaLabel(m.microtema)}
+                        </span>
+                        <span className="text-xs font-mono text-text-muted">{m.total}</span>
+                      </div>
+                      <div className="w-full bg-bg-hover rounded-full h-1.5">
+                        <div
+                          className="h-1.5 rounded-full transition-all"
+                          style={{ width: `${pct}%`, backgroundColor: getMicrotemaColor(m.microtema) }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Temas Dominantes */}
+          <div className="card">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="w-4 h-4 text-brand" />
+              <p className="text-sm font-medium text-text-secondary">Temas Dominantes</p>
+            </div>
+            {(microtemas ?? []).length === 0 ? (
+              <p className="text-xs text-text-muted">Sem dados</p>
+            ) : (
+              <div className="space-y-1.5">
+                {[...(microtemas ?? [])].sort((a, b) => b.pct_deferido - a.pct_deferido).slice(0, 5).map((m) => (
+                  <div key={m.microtema} className="flex items-center justify-between py-1 border-b border-border/40 last:border-0">
+                    <span className="text-xs text-text-secondary">{getMicrotemaLabel(m.microtema)}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono text-success">{m.deferido}✓</span>
+                      {m.indeferido > 0 && (
+                        <span className="text-xs font-mono text-error">{m.indeferido}✗</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Diretores Mais Ativos */}
+          <div className="card">
+            <div className="flex items-center gap-2 mb-3">
+              <Users className="w-4 h-4 text-brand" />
+              <p className="text-sm font-medium text-text-secondary">Diretores Mais Ativos</p>
+            </div>
+            {diretoresAtivos.length === 0 ? (
+              <p className="text-xs text-text-muted">Sem dados</p>
+            ) : (
+              <div className="space-y-2">
+                {diretoresAtivos.map((d) => (
+                  <Link
+                    key={d.diretor_id}
+                    href={`/dashboard/mandatos/${d.diretor_id}`}
+                    className="flex items-center gap-2 py-1.5 hover:bg-bg-hover rounded px-1 transition-colors group"
+                  >
+                    <div className="w-7 h-7 rounded-full bg-brand/15 flex items-center justify-center shrink-0">
+                      <span className="text-[10px] font-mono font-bold text-brand">
+                        {d.diretor_nome.split(" ").filter((w) => w.length > 2).slice(0, 2).map((w) => w[0]).join("")}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-text-primary truncate group-hover:text-brand transition-colors">
+                        {d.diretor_nome.split(" ").slice(0, 2).join(" ")}
+                      </p>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <div className="flex-1 bg-bg-hover rounded-full h-1">
+                          <div className="h-1 rounded-full bg-success" style={{ width: `${d.pct_favor}%` }} />
+                        </div>
+                        <span className="text-[10px] font-mono text-text-muted">{d.pct_favor.toFixed(0)}%</span>
+                      </div>
+                    </div>
+                    <span className="font-mono text-xs text-brand shrink-0">{d.total}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+            <Link href="/dashboard/mandatos" className="text-[10px] text-text-muted hover:text-brand mt-2 block text-right transition-colors">
+              Ver todos →
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Evolução Temporal */}
+      {reunioes.length > 0 && (
+        <section>
+          <ChartWrapper
+            title="Evolução Temporal de Decisões"
+            subtitle="Deferidos vs Indeferidos ao longo do tempo"
+            availableTypes={["area", "bar", "line"]}
+            defaultType="area"
+          >
+            {(type) => {
+              if (type === "bar") return (
+                <IrisBarChart
+                  data={microtemasAreaData.map((r) => ({ name: r.name, value: r.deferido, indeferido: r.indeferido }))}
+                  multibar={[
+                    { key: "deferido",   color: "#22c55e", label: "Deferido" },
+                    { key: "indeferido", color: "#ef4444", label: "Indeferido" },
+                  ]}
+                  xKey="name"
+                  height={220}
+                />
+              );
+              return (
+                <IrisAreaChart
+                  data={microtemasAreaData}
+                  areas={[
+                    { key: "deferido",   color: "#22c55e", label: "Deferido" },
+                    { key: "indeferido", color: "#ef4444", label: "Indeferido" },
+                  ]}
+                  height={220}
+                />
+              );
+            }}
+          </ChartWrapper>
+        </section>
+      )}
     </div>
   );
 }

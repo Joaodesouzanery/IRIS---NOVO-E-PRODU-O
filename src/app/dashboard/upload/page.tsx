@@ -17,7 +17,7 @@ import {
   Upload, FileText, CheckCircle, XCircle, Loader2,
   ChevronDown, ChevronRight, Trash2, RefreshCw, Copy, AlertTriangle,
 } from "lucide-react";
-import { appendLocalDelibs } from "@/lib/local-store";
+import { appendLocalDelibs, getLocalDelibs } from "@/lib/local-store";
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
 
@@ -49,6 +49,7 @@ interface ReviewItem extends PreviewResult {
   id: string;
   rejected: boolean;
   edited: Partial<PreviewResultFields>;
+  duplicate_reason?: string;
 }
 
 interface AnalyzeProgress {
@@ -170,8 +171,11 @@ function ReviewCard({
 
         {/* Badge duplicado */}
         {item.is_duplicate && (
-          <span className="badge bg-warning/15 text-warning text-xs flex items-center gap-1">
-            <Copy className="w-3 h-3" /> Já Processado
+          <span
+            className="badge bg-warning/15 text-warning text-xs flex items-center gap-1"
+            title={item.duplicate_reason ?? "Arquivo já processado"}
+          >
+            <Copy className="w-3 h-3" /> Duplicata
           </span>
         )}
 
@@ -217,7 +221,11 @@ function ReviewCard({
           {item.is_duplicate && (
             <div className="flex items-start gap-2 p-3 rounded-md bg-warning/10 border border-warning/20 text-sm text-warning">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              Este PDF já foi processado anteriormente. Confirme mesmo assim ou clique em "Rejeitar".
+              <span>
+                <strong>Duplicata detectada:</strong>{" "}
+                {item.duplicate_reason ?? "Este PDF já foi processado anteriormente."}{" "}
+                Confirme mesmo assim ou clique em "Rejeitar".
+              </span>
             </div>
           )}
 
@@ -456,18 +464,44 @@ export default function UploadPage() {
       return;
     }
 
-    // Persiste hashes na sessionStorage (dedup para sessão demo)
+    // ── Dedup client-side: hash de sessão + número já salvo em local ────────
+    const dedupReasons: (string | undefined)[] = new Array(allResults.length);
+    try {
+      const seenHashes = new Set<string>(
+        JSON.parse(sessionStorage.getItem("iris_seen_hashes") ?? "[]")
+      );
+      const localNumbers = new Set<string>(
+        getLocalDelibs()
+          .map((d) => d.numero_deliberacao)
+          .filter((n): n is string => !!n)
+      );
+      const batchHashes = new Set<string>();
+      const batchNumbers = new Set<string>();
+
+      for (let i = 0; i < allResults.length; i++) {
+        const r = allResults[i];
+        if (r.is_duplicate) { dedupReasons[i] = "Já processado (servidor)"; continue; }
+        const hash = r.file_hash ?? "";
+        const num  = r.fields?.numero_deliberacao ?? "";
+        if      (hash && seenHashes.has(hash))   dedupReasons[i] = "Arquivo já processado (hash idêntico)";
+        else if (num  && localNumbers.has(num))  dedupReasons[i] = `Nº ${num} já existe na base`;
+        else if (hash && batchHashes.has(hash))  dedupReasons[i] = "Arquivo duplicado neste lote";
+        else if (num  && batchNumbers.has(num))  dedupReasons[i] = `Nº ${num} duplicado neste lote`;
+        if (hash) batchHashes.add(hash);
+        if (num)  batchNumbers.add(num);
+      }
+    } catch { /* não crítico */ }
+
+    // Persiste hashes na sessionStorage após dedup
     try {
       const seen: string[] = JSON.parse(
         sessionStorage.getItem("iris_seen_hashes") ?? "[]"
       );
-      allResults.forEach((r) => {
+      for (const r of allResults) {
         if (r.file_hash && !seen.includes(r.file_hash)) seen.push(r.file_hash);
-      });
+      }
       sessionStorage.setItem("iris_seen_hashes", JSON.stringify(seen.slice(-500)));
-    } catch {
-      // sessionStorage pode estar indisponível — não é crítico
-    }
+    } catch { /* sessionStorage pode estar indisponível */ }
 
     // Auto-seleciona agência majoritária detectada (só se usuário não selecionou)
     const detectedSiglas = allResults
@@ -481,12 +515,17 @@ export default function UploadPage() {
 
     // Monta review: duplicados auto-rejeitados mas restauráveis
     setReviewItems(
-      allResults.map((r, i) => ({
-        ...r,
-        id: allFiles[i]?.id ?? crypto.randomUUID(),
-        rejected: r.is_duplicate,
-        edited: {},
-      }))
+      allResults.map((r, i) => {
+        const isDup = r.is_duplicate || !!dedupReasons[i];
+        return {
+          ...r,
+          id: allFiles[i]?.id ?? crypto.randomUUID(),
+          is_duplicate: isDup,
+          rejected: isDup,
+          duplicate_reason: dedupReasons[i],
+          edited: {},
+        };
+      })
     );
     setAnalyzeProgress({ done: allFiles.length, total: allFiles.length });
     setStage("review");

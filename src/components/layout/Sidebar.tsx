@@ -19,6 +19,8 @@ import {
   Tag,
   Building,
   Layers,
+  ShieldCheck,
+  Mail,
 } from "lucide-react";
 
 interface NavItem {
@@ -45,10 +47,13 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Análise",
     items: [
       { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+      { label: "→ Temas", href: "/dashboard/analytics/temas", icon: Tag },
+      { label: "→ Diretores", href: "/dashboard/analytics/diretores", icon: Users },
       { label: "Mandatos", href: "/dashboard/mandatos", icon: Users },
       { label: "Votação", href: "/dashboard/votacao", icon: Vote },
       { label: "Dashboard 360°", href: "/dashboard/360", icon: Layers },
       { label: "Insights", href: "/dashboard/insights", icon: Lightbulb },
+      { label: "Governança", href: "/dashboard/governanca", icon: ShieldCheck },
     ],
   },
   {
@@ -58,6 +63,12 @@ const NAV_SECTIONS: NavSection[] = [
       { label: "Setores",      href: "/dashboard/painel-regulatorio/setores",    icon: Grid3x3 },
       { label: "Microtemas",   href: "/dashboard/painel-regulatorio/microtemas", icon: Tag },
       { label: "Empresas",     href: "/dashboard/empresas",                      icon: Building },
+    ],
+  },
+  {
+    title: "Comunicação",
+    items: [
+      { label: "Boletim", href: "/dashboard/boletim", icon: Mail },
     ],
   },
   {
