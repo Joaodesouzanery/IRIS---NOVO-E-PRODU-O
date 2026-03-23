@@ -14,6 +14,9 @@ import {
   Building2,
   ChevronDown,
   Activity,
+  TrendingUp,
+  Grid3x3,
+  Tag,
 } from "lucide-react";
 
 interface NavItem {
@@ -43,6 +46,14 @@ const NAV_SECTIONS: NavSection[] = [
       { label: "Mandatos", href: "/dashboard/mandatos", icon: Users },
       { label: "Votação", href: "/dashboard/votacao", icon: Vote },
       { label: "Insights", href: "/dashboard/insights", icon: Lightbulb },
+    ],
+  },
+  {
+    title: "Painel Regulatório",
+    items: [
+      { label: "Visão Geral",  href: "/dashboard/painel-regulatorio",           icon: TrendingUp },
+      { label: "Setores",      href: "/dashboard/painel-regulatorio/setores",    icon: Grid3x3 },
+      { label: "Microtemas",   href: "/dashboard/painel-regulatorio/microtemas", icon: Tag },
     ],
   },
   {

@@ -31,3 +31,13 @@ export function clearLocalDelibs(): void {
 export function countLocalDelibs(): number {
   return getLocalDelibs().length;
 }
+
+export function updateLocalDelib(id: string, updates: Partial<Deliberacao>): boolean {
+  if (typeof window === "undefined") return false;
+  const existing = getLocalDelibs();
+  const idx = existing.findIndex((d) => d.id === id);
+  if (idx === -1) return false;
+  existing[idx] = { ...existing[idx], ...updates };
+  localStorage.setItem(KEY, JSON.stringify(existing));
+  return true;
+}

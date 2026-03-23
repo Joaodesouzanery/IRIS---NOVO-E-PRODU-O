@@ -44,6 +44,8 @@ export function getMicrotemaLabel(microtema: string): string {
     seguranca: "Segurança",
     ambiental: "Ambiental",
     desapropriacao: "Desapropriação",
+    adimplencia: "Adimplência",
+    pessoal: "Pessoal",
     usuario: "Usuário",
     outros: "Outros",
   };
@@ -61,8 +63,28 @@ export function getMicrotemaColor(microtema: string): string {
     seguranca: "#f59e0b",
     ambiental: "#22c55e",
     desapropriacao: "#ec4899",
+    adimplencia: "#0ea5e9",
+    pessoal: "#a855f7",
     usuario: "#6366f1",
     outros: "#71717a",
   };
   return colors[microtema] ?? "#71717a";
+}
+
+export const CATEGORIAS_REGULATORIAS = [
+  { id: "economico-financeiro",    label: "Econômico-Financeiro",      microtemas: ["tarifa", "reequilibrio"] as string[] },
+  { id: "contratos-concessoes",    label: "Contratos e Concessões",    microtemas: ["contrato", "obras"] as string[] },
+  { id: "controle-sancoes",        label: "Controle e Sanções",        microtemas: ["multa", "fiscalizacao", "adimplencia"] as string[] },
+  { id: "seguranca-ambiente",      label: "Segurança e Ambiente",      microtemas: ["seguranca", "ambiental"] as string[] },
+  { id: "usuarios-administrativo", label: "Usuários e Administrativo", microtemas: ["usuario", "desapropriacao", "pessoal", "outros"] as string[] },
+];
+
+export function getMicrotemaCategoria(microtema: string): string {
+  return CATEGORIAS_REGULATORIAS.find((c) => c.microtemas.includes(microtema))?.id
+    ?? "usuarios-administrativo";
+}
+
+export function getMicrotemaCategoriaLabel(microtema: string): string {
+  return CATEGORIAS_REGULATORIAS.find((c) => c.microtemas.includes(microtema))?.label
+    ?? "Usuários e Administrativo";
 }

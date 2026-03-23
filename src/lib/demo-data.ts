@@ -1,30 +1,17 @@
 /**
  * demo-data.ts
- * Dados fictícios para visualização da plataforma sem Supabase configurado.
- * Inclui 3 agências reguladoras brasileiras (transporte, energia, saúde)
- * com 25 deliberações, 9 diretores e votações matematicamente consistentes.
+ * Dados reais da ARTESP para visualização da plataforma sem Supabase configurado.
+ * Inclui apenas a ARTESP com 3 diretores reais e 10 deliberações autênticas.
  * Remova quando o Supabase estiver ativo em produção.
  */
 
 // ─── IDs fixos ─────────────────────────────────────────────────────────────
 const A_ARTESP = "demo-agency-artesp";
-const A_ANEEL  = "demo-agency-aneel";
-const A_ANVISA = "demo-agency-anvisa";
 
 // Diretores ARTESP — nomes reais conforme deliberações jan/2026
 const DA1 = "demo-dir-artesp-1"; // André Isper Rodrigues Barnabé (Diretor-Presidente)
 const DA2 = "demo-dir-artesp-2"; // Diego Albert Zanatto (Diretor)
 const DA3 = "demo-dir-artesp-3"; // Fernanda Esbízaro Rodrigues Rudnik (Diretora)
-
-// Diretores ANEEL
-const DN1 = "demo-dir-aneel-1";  // Sandoval Feitosa Filho
-const DN2 = "demo-dir-aneel-2";  // Maria Vitória Campos
-const DN3 = "demo-dir-aneel-3";  // José Luís Schiffer
-
-// Diretores ANVISA
-const DV1 = "demo-dir-anvisa-1"; // Ana Beatriz Mendes
-const DV2 = "demo-dir-anvisa-2"; // Roberto Santos Lima
-const DV3 = "demo-dir-anvisa-3"; // Cristiane Prado
 
 // ─── Mapeamento agência → diretores ──────────────────────────────────────
 const AGENCY_DIRS: Record<string, Array<{ id: string; nome: string }>> = {
@@ -33,22 +20,11 @@ const AGENCY_DIRS: Record<string, Array<{ id: string; nome: string }>> = {
     { id: DA2, nome: "Diego Albert Zanatto" },
     { id: DA3, nome: "Fernanda Esbízaro Rodrigues Rudnik" },
   ],
-  [A_ANEEL]: [
-    { id: DN1, nome: "Sandoval Feitosa Filho" },
-    { id: DN2, nome: "Maria Vitória Campos" },
-    { id: DN3, nome: "José Luís Schiffer" },
-  ],
-  [A_ANVISA]: [
-    { id: DV1, nome: "Ana Beatriz Mendes" },
-    { id: DV2, nome: "Roberto Santos Lima" },
-    { id: DV3, nome: "Cristiane Prado" },
-  ],
 };
 
 // ─── Deliberações brutas ──────────────────────────────────────────────────
-// 25 total: 10 ARTESP, 8 ANEEL, 7 ANVISA
-// Indeferidos: ARTESP 005 e 010, ANEEL 006, ANVISA 005 (4 total → taxa 84%)
-// Votos: 3 por deliberação = 75 total (67 Favoravel, 8 Desfavoravel)
+// 10 ARTESP — Indeferidos: 005 e 010
+// 3 votos por deliberação = 30 total (26 Favoravel, 4 Desfavoravel)
 // Para indeferidos: 2 Desfavoravel (maioria) + 1 Favoravel (divergente)
 
 type DelRaw = {
@@ -111,72 +87,6 @@ const DELIBERACOES_RAW: DelRaw[] = [
     resumo: "Proposta de abertura de processo administrativo por inadimplências identificadas na SP-021.",
     fundamento: "Divergência sobre critérios de avaliação do indicador de pavimento. Processo devolvido para revisão técnica.",
     divergentes: [DA2] },
-
-  // ── ANEEL (Energia Elétrica) ──────────────────────────────────────────
-  { id: "demo-aneel-001", agencia: A_ANEEL, n: "001/2024", reuniao: "878ª Reunião Ordinária de Diretoria", data: "2024-03-13",
-    interessado: "ENEL Distribuição São Paulo S.A.", processo: "ANEEL nº 48500.003412/2024", microtema: "tarifa", resultado: "Deferido",
-    resumo: "Homologação do reajuste tarifário anual da ENEL Distribuição São Paulo, com índice de 8,2%.",
-    fundamento: "Reajuste calculado conforme metodologia do IPCA. Tarifa homologada nos termos da Resolução ANEEL nº 1.000/2021." },
-  { id: "demo-aneel-002", agencia: A_ANEEL, n: "002/2024", reuniao: "879ª Reunião Ordinária de Diretoria", data: "2024-04-24",
-    interessado: "CPFL Energia S.A.", processo: "ANEEL nº 48500.005127/2024", microtema: "contrato", resultado: "Deferido",
-    resumo: "Aprovação do 3º Aditivo ao Contrato de Concessão da CPFL Energia para expansão da rede no interior paulista.",
-    fundamento: "Expansão atende metas do Plano Decenal de Energia 2033. Investimento adicional de R$ 520 milhões aprovado." },
-  { id: "demo-aneel-003", agencia: A_ANEEL, n: "003/2024", reuniao: "880ª Reunião Ordinária de Diretoria", data: "2024-05-22",
-    interessado: "Light Serviços de Eletricidade S.A.", processo: "ANEEL nº 48500.006891/2024", microtema: "multa", resultado: "Deferido",
-    resumo: "Auto de infração à Light SESA por descumprimento do indicador DEC no 1º trimestre de 2024.",
-    fundamento: "DEC apurado de 14,3h contra meta regulatória de 12h. Multa de R$ 3,2 milhões aplicada." },
-  { id: "demo-aneel-004", agencia: A_ANEEL, n: "004/2024", reuniao: "881ª Reunião Ordinária de Diretoria", data: "2024-07-17",
-    interessado: null, processo: "ANEEL nº 48500.009043/2024", microtema: "fiscalizacao", resultado: "Deferido",
-    resumo: "Relatório de Fiscalização das Distribuidoras de Energia Elétrica do Nordeste — 1º Ciclo 2024.",
-    fundamento: "Conformidade de 91,4% nas distribuidoras inspecionadas. Plano de ação expedido para as não conformes." },
-  { id: "demo-aneel-005", agencia: A_ANEEL, n: "005/2024", reuniao: "882ª Reunião Ordinária de Diretoria", data: "2024-09-11",
-    interessado: "CEMIG Distribuição S.A.", processo: "ANEEL nº 48500.011278/2024", microtema: "tarifa", resultado: "Deferido",
-    resumo: "Homologação da revisão tarifária periódica da CEMIG Distribuição com custo de capital de 8,43% a.a.",
-    fundamento: "Revisão quinquenal calculada conforme metodologia do 4º Ciclo de Revisões Tarifárias Periódicas." },
-  { id: "demo-aneel-006", agencia: A_ANEEL, n: "006/2024", reuniao: "883ª Reunião Ordinária de Diretoria", data: "2024-10-23",
-    interessado: "Celesc Distribuição S.A.", processo: "ANEEL nº 48500.013556/2024", microtema: "reequilibrio", resultado: "Indeferido",
-    resumo: "Pedido de reequilíbrio econômico-financeiro da Celesc por impacto das secas severas de 2023.",
-    fundamento: "Risco hidrológico é alocado ao setor elétrico pela regulamentação. Pedido não fundamenta desequilíbrio contratual.",
-    divergentes: [DN1] },
-  { id: "demo-aneel-007", agencia: A_ANEEL, n: "007/2025", reuniao: "884ª Reunião Ordinária de Diretoria", data: "2025-01-15",
-    interessado: "Energisa Minas-Rio Distribuidora S.A.", processo: "ANEEL nº 48500.000892/2025", microtema: "contrato", resultado: "Deferido",
-    resumo: "Aprovação do 1º Aditivo ao Contrato de Concessão da Energisa Minas-Rio, incorporando novos municípios.",
-    fundamento: "Expansão em conformidade com a Resolução Autorizativa nº 11.234/2024 e Plano de Universalização." },
-  { id: "demo-aneel-008", agencia: A_ANEEL, n: "008/2025", reuniao: "885ª Reunião Ordinária de Diretoria", data: "2025-03-12",
-    interessado: "Furnas Centrais Elétricas S.A.", processo: "ANEEL nº 48500.002341/2025", microtema: "obras", resultado: "Deferido",
-    resumo: "Aprovação do Plano de Obras de Transmissão 2025-2027 para o corredor Minas–Rio–São Paulo.",
-    fundamento: "Plano prevê R$ 2,8 bilhões em novas linhas de 500kV, garantindo confiabilidade ao sistema elétrico nacional." },
-
-  // ── ANVISA (Saúde) ────────────────────────────────────────────────────
-  { id: "demo-anvisa-001", agencia: A_ANVISA, n: "001/2024", reuniao: "n.º 3041 Ordinária", data: "2024-03-20",
-    interessado: "Roche Farma Brasil Ltda.", processo: "ANVISA nº 25351.900101/2024", microtema: "usuario", resultado: "Deferido",
-    resumo: "Recurso da Roche Farma contra indeferimento do registro do medicamento Polivy (polatuzumabe vedotina).",
-    fundamento: "Reavaliação da evidência clínica confirmou benefício-risco favorável. Registro deferido com monitoramento pós-comercialização obrigatório." },
-  { id: "demo-anvisa-002", agencia: A_ANVISA, n: "002/2024", reuniao: "n.º 3042 Ordinária", data: "2024-05-15",
-    interessado: "EMS S.A.", processo: "ANVISA nº 25351.900487/2024", microtema: "seguranca", resultado: "Deferido",
-    resumo: "Alerta de segurança e recolhimento do lote BT23-041 do antibiótico Cefalexina 500mg por contaminação.",
-    fundamento: "Análise microbiológica confirmou Bacillus cereus acima do limite aceitável. Recolhimento voluntário aprovado." },
-  { id: "demo-anvisa-003", agencia: A_ANVISA, n: "003/2024", reuniao: "n.º 3043 Ordinária", data: "2024-07-24",
-    interessado: "Pfizer Brasil Ltda.", processo: "ANVISA nº 25351.900812/2024", microtema: "contrato", resultado: "Deferido",
-    resumo: "Aprovação de Termo de Ajustamento de Conduta com a Pfizer Brasil relativo a irregularidades em BPF.",
-    fundamento: "TAC prevê R$ 45 milhões em adequações de planta fabril e cronograma de regularização de 18 meses." },
-  { id: "demo-anvisa-004", agencia: A_ANVISA, n: "004/2024", reuniao: "n.º 3044 Ordinária", data: "2024-09-18",
-    interessado: null, processo: "ANVISA nº 25351.901134/2024", microtema: "fiscalizacao", resultado: "Deferido",
-    resumo: "Relatório de Fiscalização de Boas Práticas de Fabricação nas indústrias farmacêuticas da Região Sul.",
-    fundamento: "83% das 36 indústrias inspecionadas em conformidade plena. Plano de ação expedido para os demais." },
-  { id: "demo-anvisa-005", agencia: A_ANVISA, n: "005/2024", reuniao: "n.º 3045 Ordinária", data: "2024-11-06",
-    interessado: "Eurofarma Laboratórios S.A.", processo: "ANVISA nº 25351.901478/2024", microtema: "seguranca", resultado: "Indeferido",
-    resumo: "Pedido de cancelamento de alerta de segurança sobre suplemento alimentar da Eurofarma.",
-    fundamento: "Evidências apresentadas insuficientes para reverter a classificação de risco. Alerta de segurança mantido.",
-    divergentes: [DV1] },
-  { id: "demo-anvisa-006", agencia: A_ANVISA, n: "006/2025", reuniao: "n.º 3046 Ordinária", data: "2025-01-29",
-    interessado: "Medley Farmacêutica Ltda.", processo: "ANVISA nº 25351.900089/2025", microtema: "usuario", resultado: "Deferido",
-    resumo: "Aprovação do Programa de Acesso Expandido ao Dupixent (dupilumabe) para dermatite atópica grave.",
-    fundamento: "Critérios de elegibilidade aprovados. Programa beneficia estimados 15.000 pacientes sem acesso ao tratamento padrão." },
-  { id: "demo-anvisa-007", agencia: A_ANVISA, n: "007/2025", reuniao: "n.º 3047 Ordinária", data: "2025-03-19",
-    interessado: null, processo: "ANVISA nº 25351.900312/2025", microtema: "contrato", resultado: "Deferido",
-    resumo: "Aprovação do Protocolo de Vigilância Pós-Comercialização de medicamentos de alto risco registrados em 2024.",
-    fundamento: "Protocolo alinha a ANVISA às diretrizes OMS para farmacovigilância ativa. Implementação em 90 dias." },
 ];
 
 // ─── demoData ─────────────────────────────────────────────────────────────
@@ -186,12 +96,6 @@ export const demoData = {
       { id: A_ARTESP, sigla: "ARTESP", nome: "Agência de Transporte do Estado de SP",
         nome_completo: "Agência Reguladora de Serviços Públicos Delegados de Transporte do Estado de São Paulo",
         ativo: true, created_at: "2020-01-10T10:00:00Z" },
-      { id: A_ANEEL, sigla: "ANEEL", nome: "Agência Nacional de Energia Elétrica",
-        nome_completo: "Agência Nacional de Energia Elétrica",
-        ativo: true, created_at: "2020-01-10T10:00:00Z" },
-      { id: A_ANVISA, sigla: "ANVISA", nome: "Agência Nacional de Vigilância Sanitária",
-        nome_completo: "Agência Nacional de Vigilância Sanitária",
-        ativo: true, created_at: "2020-01-10T10:00:00Z" },
     ];
   },
 
@@ -200,12 +104,6 @@ export const demoData = {
       { id: DA1, nome: "André Isper Rodrigues Barnabé",      agencia_id: A_ARTESP, cargo: "Diretor-Presidente", needs_review: false, ativo: true, created_at: "2023-06-15T10:00:00Z" },
       { id: DA2, nome: "Diego Albert Zanatto",             agencia_id: A_ARTESP, cargo: "Diretor",            needs_review: false, ativo: true, created_at: "2021-03-10T10:00:00Z" },
       { id: DA3, nome: "Fernanda Esbízaro Rodrigues Rudnik", agencia_id: A_ARTESP, cargo: "Diretora",         needs_review: false, ativo: true, created_at: "2022-07-22T10:00:00Z" },
-      { id: DN1, nome: "Sandoval Feitosa Filho",  agencia_id: A_ANEEL,  cargo: "Diretor-Geral",      needs_review: false, ativo: true, created_at: "2019-06-01T10:00:00Z" },
-      { id: DN2, nome: "Maria Vitória Campos",    agencia_id: A_ANEEL,  cargo: "Diretora",           needs_review: false, ativo: true, created_at: "2021-04-15T10:00:00Z" },
-      { id: DN3, nome: "José Luís Schiffer",      agencia_id: A_ANEEL,  cargo: "Diretor",            needs_review: false, ativo: true, created_at: "2022-02-01T10:00:00Z" },
-      { id: DV1, nome: "Ana Beatriz Mendes",      agencia_id: A_ANVISA, cargo: "Diretora-Presidente",needs_review: false, ativo: true, created_at: "2020-09-01T10:00:00Z" },
-      { id: DV2, nome: "Roberto Santos Lima",     agencia_id: A_ANVISA, cargo: "Diretor",            needs_review: false, ativo: true, created_at: "2021-11-01T10:00:00Z" },
-      { id: DV3, nome: "Cristiane Prado",         agencia_id: A_ANVISA, cargo: "Diretora",           needs_review: false, ativo: true, created_at: "2022-05-01T10:00:00Z" },
     ];
   },
 
@@ -215,12 +113,6 @@ export const demoData = {
       { id: "demo-m-1", diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",       cargo: "Diretor-Presidente", agencia_id: A_ARTESP, data_inicio: "2023-06-15", data_fim: "2027-06-14" },
       { id: "demo-m-2", diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               cargo: "Diretor",            agencia_id: A_ARTESP, data_inicio: "2021-03-10", data_fim: "2025-03-09" },
       { id: "demo-m-3", diretor_id: DA3, diretor_nome: "Fernanda Esbízaro Rodrigues Rudnik", cargo: "Diretora",           agencia_id: A_ARTESP, data_inicio: "2022-07-22", data_fim: "2026-07-21" },
-      { id: "demo-m-4", diretor_id: DN1, diretor_nome: "Sandoval Feitosa Filho",  cargo: "Diretor-Geral",      agencia_id: A_ANEEL,  data_inicio: "2023-06-01", data_fim: "2027-05-31" },
-      { id: "demo-m-5", diretor_id: DN2, diretor_nome: "Maria Vitória Campos",    cargo: "Diretora",           agencia_id: A_ANEEL,  data_inicio: "2021-04-15", data_fim: "2025-04-14" },
-      { id: "demo-m-6", diretor_id: DN3, diretor_nome: "José Luís Schiffer",      cargo: "Diretor",            agencia_id: A_ANEEL,  data_inicio: "2022-02-01", data_fim: "2026-01-31" },
-      { id: "demo-m-7", diretor_id: DV1, diretor_nome: "Ana Beatriz Mendes",      cargo: "Diretora-Presidente",agencia_id: A_ANVISA, data_inicio: "2024-09-01", data_fim: "2028-08-31" },
-      { id: "demo-m-8", diretor_id: DV2, diretor_nome: "Roberto Santos Lima",     cargo: "Diretor",            agencia_id: A_ANVISA, data_inicio: "2021-11-01", data_fim: "2025-10-31" },
-      { id: "demo-m-9", diretor_id: DV3, diretor_nome: "Cristiane Prado",         cargo: "Diretora",           agencia_id: A_ANVISA, data_inicio: "2022-05-01", data_fim: "2026-04-30" },
     ];
     return raw.map((m) => ({
       ...m,
@@ -289,18 +181,12 @@ export const demoData = {
   },
 
   // Hardcoded para evitar recalcular votos a partir do zero.
-  // Valores matematicamente consistentes com _buildVotos.
+  // DA1=André: 8F/2D/0div; DA2=Diego: 9F/1D/1div; DA3=Fernanda: 9F/1D/1div
   diretoresOverview(agencia_id?: string | null) {
     const all = [
       { diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",       agencia: A_ARTESP, total: 10, favoravel: 8,  desfavoravel: 2, divergente: 0, pct_favor: 80.0 },
       { diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               agencia: A_ARTESP, total: 10, favoravel: 9,  desfavoravel: 1, divergente: 1, pct_favor: 90.0 },
       { diretor_id: DA3, diretor_nome: "Fernanda Esbízaro Rodrigues Rudnik", agencia: A_ARTESP, total: 10, favoravel: 9,  desfavoravel: 1, divergente: 1, pct_favor: 90.0 },
-      { diretor_id: DN1, diretor_nome: "Sandoval Feitosa Filho",  agencia: A_ANEEL,  total: 8,  favoravel: 8,  desfavoravel: 0, divergente: 1, pct_favor: 100.0 },
-      { diretor_id: DN2, diretor_nome: "Maria Vitória Campos",    agencia: A_ANEEL,  total: 8,  favoravel: 7,  desfavoravel: 1, divergente: 0, pct_favor: 87.5 },
-      { diretor_id: DN3, diretor_nome: "José Luís Schiffer",      agencia: A_ANEEL,  total: 8,  favoravel: 7,  desfavoravel: 1, divergente: 0, pct_favor: 87.5 },
-      { diretor_id: DV1, diretor_nome: "Ana Beatriz Mendes",      agencia: A_ANVISA, total: 7,  favoravel: 7,  desfavoravel: 0, divergente: 1, pct_favor: 100.0 },
-      { diretor_id: DV2, diretor_nome: "Roberto Santos Lima",     agencia: A_ANVISA, total: 7,  favoravel: 6,  desfavoravel: 1, divergente: 0, pct_favor: 85.7 },
-      { diretor_id: DV3, diretor_nome: "Cristiane Prado",         agencia: A_ANVISA, total: 7,  favoravel: 6,  desfavoravel: 1, divergente: 0, pct_favor: 85.7 },
     ];
     const filtered = agencia_id ? all.filter((d) => d.agencia === agencia_id) : all;
     return filtered.map(({ agencia: _, ...rest }) => rest).sort((a, b) => b.total - a.total);
@@ -332,35 +218,19 @@ export const demoData = {
       { diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",       agencia: A_ARTESP, total: 10, favoravel: 8,  desfavoravel: 2, abstencao: 0, divergente: 0 },
       { diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               agencia: A_ARTESP, total: 10, favoravel: 9,  desfavoravel: 1, abstencao: 0, divergente: 1 },
       { diretor_id: DA3, diretor_nome: "Fernanda Esbízaro Rodrigues Rudnik", agencia: A_ARTESP, total: 10, favoravel: 9,  desfavoravel: 1, abstencao: 0, divergente: 1 },
-      { diretor_id: DN1, diretor_nome: "Sandoval Feitosa Filho",  agencia: A_ANEEL,  total: 8,  favoravel: 8,  desfavoravel: 0, abstencao: 0, divergente: 1 },
-      { diretor_id: DN2, diretor_nome: "Maria Vitória Campos",    agencia: A_ANEEL,  total: 8,  favoravel: 7,  desfavoravel: 1, abstencao: 0, divergente: 0 },
-      { diretor_id: DN3, diretor_nome: "José Luís Schiffer",      agencia: A_ANEEL,  total: 8,  favoravel: 7,  desfavoravel: 1, abstencao: 0, divergente: 0 },
-      { diretor_id: DV1, diretor_nome: "Ana Beatriz Mendes",      agencia: A_ANVISA, total: 7,  favoravel: 7,  desfavoravel: 0, abstencao: 0, divergente: 1 },
-      { diretor_id: DV2, diretor_nome: "Roberto Santos Lima",     agencia: A_ANVISA, total: 7,  favoravel: 6,  desfavoravel: 1, abstencao: 0, divergente: 0 },
-      { diretor_id: DV3, diretor_nome: "Cristiane Prado",         agencia: A_ANVISA, total: 7,  favoravel: 6,  desfavoravel: 1, abstencao: 0, divergente: 0 },
     ];
     const filtered = agencia_id ? all.filter((d) => d.agencia === agencia_id) : all;
     return filtered.map(({ agencia: _, ...rest }) => rest).sort((a, b) => b.total - a.total);
   },
 
   votacaoDistribution(agencia_id?: string | null) {
-    // 75 votos totais: 67 Favoravel, 8 Desfavoravel
-    // Por agência: ARTESP 26F+4D, ANEEL 22F+2D, ANVISA 19F+2D
-    if (agencia_id === A_ARTESP) return [
-      { tipo_voto: "Favoravel", count: 26, pct: "86.7" },
-      { tipo_voto: "Desfavoravel", count: 4, pct: "13.3" },
-    ];
-    if (agencia_id === A_ANEEL) return [
-      { tipo_voto: "Favoravel", count: 22, pct: "91.7" },
-      { tipo_voto: "Desfavoravel", count: 2, pct: "8.3" },
-    ];
-    if (agencia_id === A_ANVISA) return [
-      { tipo_voto: "Favoravel", count: 19, pct: "90.5" },
-      { tipo_voto: "Desfavoravel", count: 2, pct: "9.5" },
+    // 10 deliberações × 3 diretores = 30 votos: 26 Favoravel, 4 Desfavoravel
+    if (agencia_id && agencia_id !== A_ARTESP) return [
+      { tipo_voto: "Favoravel", count: 0, pct: "0" },
     ];
     return [
-      { tipo_voto: "Favoravel",    count: 67, pct: "89.3" },
-      { tipo_voto: "Desfavoravel", count: 8,  pct: "10.7" },
+      { tipo_voto: "Favoravel",    count: 26, pct: "86.7" },
+      { tipo_voto: "Desfavoravel", count: 4,  pct: "13.3" },
     ];
   },
 
@@ -369,12 +239,6 @@ export const demoData = {
       { diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",       agencia: A_ARTESP, total_votos: 10, votos_nominais: 2, votos_divergentes: 0, taxa_fidelidade: "100.0" },
       { diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               agencia: A_ARTESP, total_votos: 10, votos_nominais: 2, votos_divergentes: 1, taxa_fidelidade: "90.0" },
       { diretor_id: DA3, diretor_nome: "Fernanda Esbízaro Rodrigues Rudnik", agencia: A_ARTESP, total_votos: 10, votos_nominais: 2, votos_divergentes: 1, taxa_fidelidade: "90.0" },
-      { diretor_id: DN1, diretor_nome: "Sandoval Feitosa Filho",  agencia: A_ANEEL,  total_votos: 8,  votos_nominais: 1, votos_divergentes: 1, taxa_fidelidade: "87.5" },
-      { diretor_id: DN2, diretor_nome: "Maria Vitória Campos",    agencia: A_ANEEL,  total_votos: 8,  votos_nominais: 1, votos_divergentes: 0, taxa_fidelidade: "100.0" },
-      { diretor_id: DN3, diretor_nome: "José Luís Schiffer",      agencia: A_ANEEL,  total_votos: 8,  votos_nominais: 1, votos_divergentes: 0, taxa_fidelidade: "100.0" },
-      { diretor_id: DV1, diretor_nome: "Ana Beatriz Mendes",      agencia: A_ANVISA, total_votos: 7,  votos_nominais: 1, votos_divergentes: 1, taxa_fidelidade: "85.7" },
-      { diretor_id: DV2, diretor_nome: "Roberto Santos Lima",     agencia: A_ANVISA, total_votos: 7,  votos_nominais: 1, votos_divergentes: 0, taxa_fidelidade: "100.0" },
-      { diretor_id: DV3, diretor_nome: "Cristiane Prado",         agencia: A_ANVISA, total_votos: 7,  votos_nominais: 1, votos_divergentes: 0, taxa_fidelidade: "100.0" },
     ];
     const filtered = agencia_id ? all.filter((d) => d.agencia === agencia_id) : all;
     return filtered.map(({ agencia: _, ...rest }) => rest);
@@ -447,12 +311,9 @@ export const demoData = {
   mandatosStats(agencia_id?: string | null) {
     const rows = agencia_id ? DELIBERACOES_RAW.filter((d) => d.agencia === agencia_id) : DELIBERACOES_RAW;
     const total = rows.length;
-    // Count unique director IDs for the agency
     const dirs = agencia_id ? (AGENCY_DIRS[agencia_id] ?? []) : Object.values(AGENCY_DIRS).flat();
     const diretores_ativos = dirs.length;
-    // Participações colegiadas = total votos (3 per deliberation)
     const participacoes_colegiadas = total * dirs.length;
-    // Taxa de consenso: deliberações sem votos divergentes / total
     const comDivergencia = rows.filter((d) => (d.divergentes ?? []).length > 0).length;
     const taxa_consenso = total > 0
       ? ((((total - comDivergencia) / total) * 100).toFixed(1) + "%")
@@ -480,7 +341,6 @@ export const demoData = {
     const mandato = this.mandatos().find((m) => m.diretor_id === id) ?? null;
     const agencia = this.agencias().find((a) => a.id === diretor.agencia_id) ?? null;
 
-    // Compute vote history from all deliberations
     const historico: Array<{
       deliberacao_id: string; numero_deliberacao: string | null; data_reuniao: string | null;
       interessado: string | null; microtema: string | null; resultado: string | null;

@@ -1,23 +1,39 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { MicrotemaStats, DiretorOverviewItem } from "@/types";
+import type { MicrotemaStats, DiretorOverviewItem, Agencia } from "@/types";
 import { IrisBarChart } from "@/components/charts/IrisBarChart";
 import { GaugeChart } from "@/components/charts/GaugeChart";
 import { getMicrotemaLabel, formatNumber } from "@/lib/utils";
 import Link from "next/link";
 import { BarChart3, Users, Building2 } from "lucide-react";
 
+const ANOS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
+
 export default function AnalyticsPage() {
+  const [agenciaId, setAgenciaId] = useState("");
+  const [year, setYear] = useState("");
+
+  const params = new URLSearchParams();
+  if (agenciaId) params.set("agencia_id", agenciaId);
+  if (year) params.set("year", year);
+  const qs = params.toString() ? `?${params.toString()}` : "";
+
+  const { data: agencias } = useQuery({
+    queryKey: ["agencias"],
+    queryFn: () => api.get<Agencia[]>("/agencias"),
+  });
+
   const { data: microtemas } = useQuery({
-    queryKey: ["dashboard", "microtemas"],
-    queryFn: () => api.get<MicrotemaStats[]>("/dashboard/microtemas"),
+    queryKey: ["dashboard", "microtemas", agenciaId, year],
+    queryFn: () => api.get<MicrotemaStats[]>(`/dashboard/microtemas${qs}`),
   });
 
   const { data: diretores } = useQuery({
-    queryKey: ["dashboard", "diretores-overview"],
-    queryFn: () => api.get<DiretorOverviewItem[]>("/dashboard/diretores/overview"),
+    queryKey: ["dashboard", "diretores-overview", agenciaId],
+    queryFn: () => api.get<DiretorOverviewItem[]>(`/dashboard/diretores/overview${agenciaId ? `?agencia_id=${agenciaId}` : ""}`),
   });
 
   const maisIndeferido = (microtemas ?? []).reduce(
@@ -37,12 +53,33 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-text-primary">Analytics</h1>
           <p className="text-sm text-text-muted mt-1">Métricas analíticas por tema e diretor</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Filtros */}
+          <select
+            className="select w-40 text-xs"
+            value={agenciaId}
+            onChange={(e) => setAgenciaId(e.target.value)}
+          >
+            <option value="">Todas as agências</option>
+            {(agencias ?? []).map((a) => (
+              <option key={a.id} value={a.id}>{a.sigla}</option>
+            ))}
+          </select>
+          <select
+            className="select w-28 text-xs"
+            value={year}
+            onChange={(e) => setYear(e.target.value)}
+          >
+            <option value="">Todos os anos</option>
+            {ANOS.map((a) => (
+              <option key={a} value={String(a)}>{a}</option>
+            ))}
+          </select>
           <Link href="/dashboard/analytics/diretores" className="btn-secondary text-xs">
             <Users className="w-3.5 h-3.5" /> Por Diretor
           </Link>
@@ -115,7 +152,7 @@ export default function AnalyticsPage() {
               </p>
               <GaugeChart
                 value={d.pct_favor}
-                label="Taxa Deferimento"
+                label="Taxa Favorável"
                 size={150}
               />
               <div className="mt-3 space-y-1">
