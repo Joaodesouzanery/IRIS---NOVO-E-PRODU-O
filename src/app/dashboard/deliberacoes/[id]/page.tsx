@@ -5,12 +5,25 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { Deliberacao } from "@/types";
 import { formatDate, getMicrotemaLabel, cn } from "@/lib/utils";
-import { ArrowLeft, CheckCircle, XCircle, Pencil, Save, X } from "lucide-react";
+import {
+  ArrowLeft, CheckCircle, XCircle, Pencil, Save, X,
+  ChevronDown, ChevronUp, Users, FileText, ShieldCheck,
+} from "lucide-react";
 import Link from "next/link";
 import { getLocalDelibs, updateLocalDelib } from "@/lib/local-store";
 
-const RESULTADOS = ["Deferido", "Indeferido", "Parcialmente Deferido", "Retirado de Pauta", "Ratificado", "Aprovado", "Aprovado com Ressalvas", "Aprovado por Unanimidade", "Recomendado", "Determinado", "Autorizado"];
-const MICROTEMAS = ["tarifa", "obras", "multa", "contrato", "reequilibrio", "fiscalizacao", "seguranca", "ambiental", "desapropriacao", "adimplencia", "pessoal", "usuario", "outros"];
+const RESULTADOS = [
+  "Deferido", "Indeferido", "Parcialmente Deferido", "Retirado de Pauta",
+  "Ratificado", "Aprovado", "Aprovado com Ressalvas", "Aprovado por Unanimidade",
+  "Recomendado", "Determinado", "Autorizado",
+];
+const MICROTEMAS = [
+  "tarifa", "obras", "multa", "contrato", "reequilibrio",
+  "fiscalizacao", "seguranca", "ambiental", "desapropriacao",
+  "adimplencia", "pessoal", "usuario", "outros",
+];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -21,12 +34,46 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function voteBadgeClass(tipo: string) {
+  if (tipo === "Favoravel") return "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30";
+  if (tipo === "Desfavoravel" || tipo === "Contra") return "bg-red-500/15 text-red-400 border border-red-500/30";
+  if (tipo === "Abstencao") return "bg-zinc-500/15 text-zinc-400 border border-zinc-500/30";
+  return "bg-orange-500/15 text-orange-400 border border-orange-500/30";
+}
+
+function voteLabel(tipo: string) {
+  if (tipo === "Favoravel") return "Favorável";
+  if (tipo === "Desfavoravel") return "Desfavorável";
+  if (tipo === "Abstencao") return "Abstenção";
+  return tipo;
+}
+
+function initials(nome: string) {
+  return nome
+    .split(" ")
+    .filter((p) => p.length > 2)
+    .slice(0, 2)
+    .map((p) => p[0].toUpperCase())
+    .join("");
+}
+
+function resultadoColor(r: string | null) {
+  if (!r) return "text-text-muted";
+  if (r === "Deferido" || r.startsWith("Aprovado") || r === "Ratificado" || r === "Autorizado" || r === "Recomendado" || r === "Determinado") return "text-success";
+  if (r === "Indeferido") return "text-error";
+  if (r === "Parcialmente Deferido") return "text-amber-400";
+  return "text-text-secondary";
+}
+
+// ─── Página ───────────────────────────────────────────────────────────────────
+
 export default function DeliberacaoDetailPage({ params }: { params: { id: string } }) {
   const queryClient = useQueryClient();
-  const [editing, setEditing]     = useState(false);
-  const [form, setForm]           = useState<Partial<Deliberacao>>({});
-  const [saving, setSaving]       = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [editing, setEditing]         = useState(false);
+  const [form, setForm]               = useState<Partial<Deliberacao>>({});
+  const [saving, setSaving]           = useState(false);
+  const [saveError, setSaveError]     = useState<string | null>(null);
+  const [showRaw, setShowRaw]         = useState(false);
 
   const isLocal = params.id.startsWith("local-");
 
@@ -63,16 +110,16 @@ export default function DeliberacaoDetailPage({ params }: { params: { id: string
         await queryClient.invalidateQueries({ queryKey: ["deliberacao", params.id] });
       } else {
         const allowed = {
-          numero_deliberacao:  form.numero_deliberacao,
-          reuniao_ordinaria:   form.reuniao_ordinaria,
-          data_reuniao:        form.data_reuniao,
-          interessado:         form.interessado,
-          processo:            form.processo,
-          microtema:           form.microtema,
-          resultado:           form.resultado,
-          pauta_interna:       form.pauta_interna,
-          resumo_pleito:       form.resumo_pleito,
-          fundamento_decisao:  form.fundamento_decisao,
+          numero_deliberacao: form.numero_deliberacao,
+          reuniao_ordinaria:  form.reuniao_ordinaria,
+          data_reuniao:       form.data_reuniao,
+          interessado:        form.interessado,
+          processo:           form.processo,
+          microtema:          form.microtema,
+          resultado:          form.resultado,
+          pauta_interna:      form.pauta_interna,
+          resumo_pleito:      form.resumo_pleito,
+          fundamento_decisao: form.fundamento_decisao,
         };
         await api.patch(`/deliberacoes/${params.id}`, allowed);
         await queryClient.invalidateQueries({ queryKey: ["deliberacao", params.id] });
@@ -108,18 +155,22 @@ export default function DeliberacaoDetailPage({ params }: { params: { id: string
     );
   }
 
+  const confidence = deliberacao.extraction_confidence ?? 0;
+
   return (
-    <div className="max-w-3xl space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Link href="/dashboard/deliberacoes" className="btn-secondary py-1 px-2">
+    <div className="max-w-3xl space-y-5 animate-fade-in">
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="flex items-start gap-3 flex-wrap">
+        <Link href="/dashboard/deliberacoes" className="btn-secondary py-1 px-2 mt-0.5">
           <ArrowLeft className="w-4 h-4" />
         </Link>
-        <div>
+
+        <div className="flex-1 min-w-0">
           <p className="text-xs text-text-muted font-mono">Deliberação</p>
           {editing ? (
             <input
-              className="input text-xl font-semibold w-56"
+              className="input text-xl font-semibold w-56 mt-0.5"
               value={form.numero_deliberacao ?? ""}
               onChange={(e) => set("numero_deliberacao", e.target.value || null)}
               placeholder="Número da deliberação"
@@ -129,48 +180,55 @@ export default function DeliberacaoDetailPage({ params }: { params: { id: string
               {deliberacao.numero_deliberacao ?? deliberacao.id.slice(0, 8)}
             </h1>
           )}
-        </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          {!editing && deliberacao.resultado && (
-            <>
-              {deliberacao.resultado === "Deferido" ? (
-                <CheckCircle className="w-5 h-5 text-success" />
-              ) : (
-                <XCircle className="w-5 h-5 text-error" />
-              )}
-              <span className={cn(
-                "text-lg font-semibold",
-                deliberacao.resultado === "Deferido" ? "text-success" : "text-error"
-              )}>
+          {/* Sub-header: reunião + resultado */}
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {deliberacao.reuniao_ordinaria && (
+              <span className="text-xs text-text-muted font-mono">
+                {deliberacao.reuniao_ordinaria}
+              </span>
+            )}
+            {deliberacao.reuniao_ordinaria && deliberacao.resultado && (
+              <span className="text-text-muted text-xs">·</span>
+            )}
+            {deliberacao.resultado && (
+              <span className={cn("text-xs font-medium", resultadoColor(deliberacao.resultado))}>
                 {deliberacao.resultado}
               </span>
-            </>
+            )}
+            {/* Pauta badge */}
+            <span className={cn(
+              "text-xs px-2 py-0.5 rounded-full font-mono border",
+              deliberacao.pauta_interna
+                ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                : "bg-brand/10 text-brand border-brand/20"
+            )}>
+              {deliberacao.pauta_interna ? "Pauta Interna" : "Pauta Pública"}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {!editing && deliberacao.resultado && (
+            deliberacao.resultado === "Deferido" || deliberacao.resultado?.startsWith("Aprovado") ? (
+              <CheckCircle className="w-5 h-5 text-success" />
+            ) : deliberacao.resultado === "Indeferido" ? (
+              <XCircle className="w-5 h-5 text-error" />
+            ) : null
           )}
 
           {editing ? (
             <>
-              <button
-                className="btn-secondary text-xs flex items-center gap-1.5"
-                onClick={cancelEdit}
-                disabled={saving}
-              >
+              <button className="btn-secondary text-xs flex items-center gap-1.5" onClick={cancelEdit} disabled={saving}>
                 <X className="w-3.5 h-3.5" /> Cancelar
               </button>
-              <button
-                className="btn-primary text-xs flex items-center gap-1.5"
-                onClick={handleSave}
-                disabled={saving}
-              >
+              <button className="btn-primary text-xs flex items-center gap-1.5" onClick={handleSave} disabled={saving}>
                 <Save className="w-3.5 h-3.5" />
                 {saving ? "Salvando..." : "Salvar"}
               </button>
             </>
           ) : (
-            <button
-              className="btn-secondary text-xs flex items-center gap-1.5"
-              onClick={startEdit}
-            >
+            <button className="btn-secondary text-xs flex items-center gap-1.5" onClick={startEdit}>
               <Pencil className="w-3.5 h-3.5" /> Editar
             </button>
           )}
@@ -178,20 +236,19 @@ export default function DeliberacaoDetailPage({ params }: { params: { id: string
       </div>
 
       {saveError && (
-        <div className="card border-error/30 py-2 px-3 text-sm text-error">
-          {saveError}
-        </div>
+        <div className="card border-error/30 py-2 px-3 text-sm text-error">{saveError}</div>
       )}
 
-      {/* Informações principais */}
+      {/* ── Informações da Reunião ──────────────────────────────────────── */}
       <div className="card">
-        <p className="section-label mb-4">Informações da Reunião</p>
+        <div className="flex items-center gap-2 mb-4">
+          <FileText className="w-4 h-4 text-brand" />
+          <p className="section-label">Informações da Reunião</p>
+        </div>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Data da Reunião">
             {editing ? (
-              <input
-                type="date"
-                className="input text-sm w-full font-mono"
+              <input type="date" className="input text-sm w-full font-mono"
                 value={form.data_reuniao ?? ""}
                 onChange={(e) => set("data_reuniao", e.target.value || null)}
               />
@@ -200,23 +257,9 @@ export default function DeliberacaoDetailPage({ params }: { params: { id: string
             )}
           </Field>
 
-          <Field label="Processo">
-            {editing ? (
-              <input
-                className="input text-sm w-full"
-                value={form.processo ?? ""}
-                onChange={(e) => set("processo", e.target.value || null)}
-                placeholder="Número do processo"
-              />
-            ) : (
-              <p className="text-sm text-text-primary">{deliberacao.processo ?? "—"}</p>
-            )}
-          </Field>
-
           <Field label="Reunião Ordinária">
             {editing ? (
-              <input
-                className="input text-sm w-full"
+              <input className="input text-sm w-full"
                 value={form.reuniao_ordinaria ?? ""}
                 onChange={(e) => set("reuniao_ordinaria", e.target.value || null)}
                 placeholder="Ex: 321ª Reunião Ordinária"
@@ -226,10 +269,21 @@ export default function DeliberacaoDetailPage({ params }: { params: { id: string
             )}
           </Field>
 
+          <Field label="Processo">
+            {editing ? (
+              <input className="input text-sm w-full"
+                value={form.processo ?? ""}
+                onChange={(e) => set("processo", e.target.value || null)}
+                placeholder="Número do processo"
+              />
+            ) : (
+              <p className="text-sm text-text-primary font-mono text-xs">{deliberacao.processo ?? "—"}</p>
+            )}
+          </Field>
+
           <Field label="Interessado">
             {editing ? (
-              <input
-                className="input text-sm w-full"
+              <input className="input text-sm w-full"
                 value={form.interessado ?? ""}
                 onChange={(e) => set("interessado", e.target.value || null)}
                 placeholder="Nome do interessado"
@@ -241,11 +295,8 @@ export default function DeliberacaoDetailPage({ params }: { params: { id: string
 
           <Field label="Microtema">
             {editing ? (
-              <select
-                className="select w-full text-sm"
-                value={form.microtema ?? ""}
-                onChange={(e) => set("microtema", e.target.value || null)}
-              >
+              <select className="select w-full text-sm" value={form.microtema ?? ""}
+                onChange={(e) => set("microtema", e.target.value || null)}>
                 <option value="">— Selecione —</option>
                 {MICROTEMAS.map((m) => (
                   <option key={m} value={m}>{getMicrotemaLabel(m)}</option>
@@ -260,27 +311,24 @@ export default function DeliberacaoDetailPage({ params }: { params: { id: string
 
           <Field label="Resultado">
             {editing ? (
-              <select
-                className="select w-full text-sm"
-                value={form.resultado ?? ""}
-                onChange={(e) => set("resultado", (e.target.value || null) as Deliberacao["resultado"])}
-              >
+              <select className="select w-full text-sm" value={form.resultado ?? ""}
+                onChange={(e) => set("resultado", (e.target.value || null) as Deliberacao["resultado"])}>
                 <option value="">— Selecione —</option>
                 {RESULTADOS.map((r) => (
                   <option key={r} value={r}>{r}</option>
                 ))}
               </select>
             ) : (
-              <p className="text-sm text-text-primary">{deliberacao.resultado ?? "—"}</p>
+              <p className={cn("text-sm font-medium", resultadoColor(deliberacao.resultado))}>
+                {deliberacao.resultado ?? "—"}
+              </p>
             )}
           </Field>
 
           <Field label="Tipo de Pauta">
             {editing ? (
               <label className="flex items-center gap-2 cursor-pointer mt-1">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 accent-brand"
+                <input type="checkbox" className="w-4 h-4 accent-brand"
                   checked={form.pauta_interna ?? false}
                   onChange={(e) => set("pauta_interna", e.target.checked)}
                 />
@@ -288,49 +336,88 @@ export default function DeliberacaoDetailPage({ params }: { params: { id: string
               </label>
             ) : (
               <p className="text-sm text-text-primary">
-                {deliberacao.pauta_interna ? "Pauta Interna" : "Pauta Externa"}
+                {deliberacao.pauta_interna ? "Pauta Interna" : "Pauta Pública"}
               </p>
             )}
           </Field>
 
           <Field label="Confiança IA">
-            <p className="text-sm text-text-primary">
-              {deliberacao.extraction_confidence != null
-                ? `${(deliberacao.extraction_confidence * 100).toFixed(0)}%`
-                : "—"}
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="flex-1 h-1.5 bg-bg-hover rounded-full overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all",
+                    confidence >= 0.75 ? "bg-success" :
+                    confidence >= 0.5  ? "bg-amber-400" : "bg-error"
+                  )}
+                  style={{ width: `${Math.round(confidence * 100)}%` }}
+                />
+              </div>
+              <span className="text-xs text-text-muted font-mono">
+                {Math.round(confidence * 100)}%
+              </span>
+            </div>
           </Field>
         </div>
       </div>
 
-      {/* Votos */}
-      {deliberacao.votos && deliberacao.votos.length > 0 && (
-        <div className="card">
-          <p className="section-label mb-3">Votos</p>
-          <div className="space-y-2">
-            {deliberacao.votos.map((v) => (
-              <div key={v.id} className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
-                <span className="text-sm text-text-primary">{v.diretor_nome ?? v.diretor_id}</span>
-                <div className="flex items-center gap-2">
-                  {v.is_divergente && (
-                    <span className="badge-red text-xs">Divergente</span>
-                  )}
-                  <span className={cn(
-                    "badge text-xs",
-                    v.tipo_voto === "Favoravel" ? "badge-green" :
-                    v.tipo_voto === "Desfavoravel" ? "badge-red" :
-                    "badge-gray"
-                  )}>
-                    {v.tipo_voto}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* ── Votação Individual ─────────────────────────────────────────── */}
+      <div className="card">
+        <div className="flex items-center gap-2 mb-4">
+          <Users className="w-4 h-4 text-brand" />
+          <p className="section-label">Votação Individual</p>
+          {deliberacao.votos && deliberacao.votos.length > 0 && (
+            <span className="ml-auto text-xs text-text-muted font-mono">
+              {deliberacao.votos.length} {deliberacao.votos.length === 1 ? "voto" : "votos"}
+            </span>
+          )}
         </div>
-      )}
 
-      {/* Resumo do pleito */}
+        {deliberacao.votos && deliberacao.votos.length > 0 ? (
+          <div className="space-y-2">
+            {deliberacao.votos.map((v) => {
+              const nome = v.diretor_nome ?? v.diretor_id;
+              return (
+                <div
+                  key={v.id}
+                  className="flex items-center gap-3 py-2 px-3 rounded-lg bg-bg-hover/50 border border-border/40"
+                >
+                  {/* Avatar */}
+                  <div className="w-8 h-8 rounded-full bg-brand/15 flex items-center justify-center shrink-0">
+                    <span className="text-xs font-bold text-brand font-mono">
+                      {initials(nome)}
+                    </span>
+                  </div>
+
+                  {/* Nome */}
+                  <span className="text-sm text-text-primary flex-1 min-w-0 truncate">
+                    {nome}
+                  </span>
+
+                  {/* Badges */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {v.is_divergente && (
+                      <span className="text-xs px-1.5 py-0.5 rounded font-mono bg-orange-500/15 text-orange-400 border border-orange-500/25">
+                        Divergente
+                      </span>
+                    )}
+                    <span className={cn(
+                      "text-xs px-2 py-0.5 rounded font-mono",
+                      voteBadgeClass(v.tipo_voto)
+                    )}>
+                      {voteLabel(v.tipo_voto)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-text-muted italic">Votação não registrada para esta deliberação.</p>
+        )}
+      </div>
+
+      {/* ── Resumo do Pleito ─────────────────────────────────────────────── */}
       <div className="card">
         <p className="section-label mb-3">Resumo do Pleito</p>
         {editing ? (
@@ -341,14 +428,16 @@ export default function DeliberacaoDetailPage({ params }: { params: { id: string
             onChange={(e) => set("resumo_pleito", e.target.value || null)}
             placeholder="Descreva o resumo do pleito..."
           />
-        ) : (
-          <p className="text-sm text-text-secondary leading-relaxed">
-            {deliberacao.resumo_pleito ?? "—"}
+        ) : deliberacao.resumo_pleito ? (
+          <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">
+            {deliberacao.resumo_pleito}
           </p>
+        ) : (
+          <p className="text-sm text-text-muted italic">Não informado.</p>
         )}
       </div>
 
-      {/* Fundamento da decisão */}
+      {/* ── Fundamento da Decisão ────────────────────────────────────────── */}
       <div className="card">
         <p className="section-label mb-3">Fundamento da Decisão</p>
         {editing ? (
@@ -359,12 +448,40 @@ export default function DeliberacaoDetailPage({ params }: { params: { id: string
             onChange={(e) => set("fundamento_decisao", e.target.value || null)}
             placeholder="Descreva o fundamento da decisão..."
           />
-        ) : (
+        ) : deliberacao.fundamento_decisao ? (
           <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">
-            {deliberacao.fundamento_decisao ?? "—"}
+            {deliberacao.fundamento_decisao}
           </p>
+        ) : (
+          <p className="text-sm text-text-muted italic">Não informado.</p>
         )}
       </div>
+
+      {/* ── Dados Brutos de Extração (IA) ─────────────────────────────────── */}
+      {deliberacao.raw_extraction && (
+        <div className="card">
+          <button
+            className="w-full flex items-center justify-between text-left"
+            onClick={() => setShowRaw((v) => !v)}
+          >
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-text-muted" />
+              <p className="section-label">Dados Brutos de Extração (IA)</p>
+            </div>
+            {showRaw ? (
+              <ChevronUp className="w-4 h-4 text-text-muted" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-text-muted" />
+            )}
+          </button>
+
+          {showRaw && (
+            <pre className="mt-4 p-3 rounded-lg bg-bg-base border border-border text-xs font-mono text-text-muted overflow-x-auto leading-relaxed">
+              {JSON.stringify(deliberacao.raw_extraction, null, 2)}
+            </pre>
+          )}
+        </div>
+      )}
     </div>
   );
 }

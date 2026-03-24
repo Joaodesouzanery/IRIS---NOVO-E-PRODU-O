@@ -76,6 +76,7 @@ export interface Deliberacao {
   resumo_pleito?: string | null;
   fundamento_decisao?: string | null;
   votos?: VotoEmbutido[];
+  raw_extraction?: Record<string, unknown> | null;
 }
 
 export interface DeliberacaoPaginada {
@@ -289,6 +290,7 @@ export interface PreviewResult {
   duplicate_job_id: string | null;
   agencia_id_detected: string | null;
   agencia_sigla_detected: string | null;
+  extraction_raw?: Record<string, unknown>;
 }
 
 export interface BatchPreviewResponse {
@@ -311,6 +313,7 @@ export interface ConfirmDelib {
   nomes_votacao: string[];
   nomes_votacao_contra: string[];
   extraction_confidence: number;
+  extraction_raw?: Record<string, unknown>;
 }
 
 export interface ConfirmResult {

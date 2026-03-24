@@ -61,6 +61,7 @@ function sanitizeDelib(d: ConfirmDelib): ConfirmDelib {
       d.extraction_confidence <= 1
         ? d.extraction_confidence
         : 0,
+    extraction_raw: d.extraction_raw && typeof d.extraction_raw === "object" ? d.extraction_raw : undefined,
   };
 }
 
@@ -149,6 +150,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         extraction_confidence: d.extraction_confidence,
         created_at: new Date().toISOString(),
         votos,
+        raw_extraction: d.extraction_raw ?? null,
       });
 
       results.push({ filename: d.filename, status: "created", deliberacao_id: id });
@@ -216,6 +218,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             extraction_confidence: d.extraction_confidence,
             resumo_pleito: d.resumo_pleito,
             fundamento_decisao: d.fundamento_decisao,
+            raw_extraction: d.extraction_raw ?? null,
           })
           .select("id")
           .single();

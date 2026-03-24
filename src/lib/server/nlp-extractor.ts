@@ -19,8 +19,12 @@ const RE_ASSUNTO     = /Assunto[:\s]+([^\n]{3,300})/gi;
 // Prioridade de normalização definida em normalizeResultado().
 const RE_RESULTADO = /\b(DEFERIDO|INDEFERIDO|DEFERIMENTO|INDEFERIMENTO|PARCIALMENTE\s*DEFERIDO|RETIRADO\s*DE\s*PAUTA|RATIFICA(?:DO)?|APROVA(?:DO)?(?:\s*COM\s*RESSALVAS)?|RECOMENDA(?:DO)?|DETERMINA(?:DO)?|AUTORIZA(?:DO)?)\b/gi;
 
-// Unanimidade como fallback quando nenhum verbo explícito é encontrado
-const RE_UNANIMIDADE = /unanimidade\s+de\s+votos/gi;
+// Unanimidade — qualquer das frases comuns em deliberações brasileiras
+const RE_UNANIMIDADE = /(?:por\s+unanimidade(?:\s+d[eo]s?\s+(?:votos?|presentes?))?|unanimidade\s+d[eo]s?\s+votos?|unanimidade\s+d[eo]s?\s+presentes?|aprovad[oa]\s+(?:pelos?\s+presentes?\s+)?por\s+unanimidade)/gi;
+
+// Voto dissidente / divergente — extrai o nome do diretor que votou contra
+const RE_VOTO_DISSIDENTE =
+  /(?:pelo\s+voto\s+(?:dissidente|divergente|contrário)\s+d[oa]?\s+(?:Diretor[a]?\s+)?|Diretor[a]?\s+\S+\s+votou?\s+(?:de\s+forma\s+)?(?:contrári[ao]|dissidente|divergente)[,\s]+)((?:[A-ZÁÉÍÓÚÂÊÔÃÕÇÀÜ][a-záéíóúâêôãõçàü]+\s+){1,5})/gi;
 
 // ─── Datas ─────────────────────────────────────────────────────────────────
 const MESES: Record<string, number> = {
@@ -46,9 +50,12 @@ const RE_VOTO_DIRECAO =
 // Número ordinal da reunião — apenas o dígito "1176"
 const RE_NUMERO_REUNIAO = /(\d{3,4})[ªa°º]?\s*Reuni[aã]o/gi;
 
-// Padrão D: bloco de assinatura ARTESP — "Nome Completo\nDiretor-Presidente"
-// Captura o nome que aparece imediatamente acima do cargo no rodapé do documento.
+// Padrão D: bloco de assinatura em Title Case — "Nome Completo\nDiretor-Presidente"
 const RE_ASSINATURA = /^([A-ZÁÉÍÓÚÂÊÔÃÕÇÀÜ][a-záéíóúâêôãõçàü][a-záéíóúâêôãõçàü\s]+)\s*\n\s*(?:Diretor(?:-Presidente)?|Diretora(?:-Presidente)?|Conselheiro(?:-Presidente)?|Conselheira|Presidente)/gm;
+
+// Padrão E: bloco de assinatura ARTESP em CAIXA ALTA — "NOME COMPLETO\nDiretor-Presidente"
+// Necessário porque deliberações ARTESP usam nomes em maiúsculas no rodapé.
+const RE_ASSINATURA_CAPS = /^([A-ZÁÉÍÓÚÂÊÔÃÕÇÀÜ]{2}[A-ZÁÉÍÓÚÂÊÔÃÕÇÀÜ\s]+)\s*\n\s*(?:Diretor(?:-Presidente)?|Diretora(?:-Presidente)?|Conselheiro(?:-Presidente)?|Conselheira|Presidente)/gm;
 
 // ─── Utilitários ───────────────────────────────────────────────────────────
 function firstMatch(text: string, pattern: RegExp, group = 1): string | null {
@@ -123,6 +130,8 @@ export interface ExtractedFields {
   nomes_votacao: string[];          // todos os nomes (compatibilidade)
   nomes_votacao_favor: string[];    // nomes que votaram a favor
   nomes_votacao_contra: string[];   // nomes que votaram contra/abstenção
+  signatarios: string[];            // diretores identificados no bloco de assinatura
+  unanimidade_detectada: boolean;   // true se "por unanimidade" encontrado no texto
 }
 
 // ─── Extração principal ───────────────────────────────────────────────────
@@ -178,48 +187,88 @@ export function extractFields(text: string): ExtractedFields {
   // Número da reunião (apenas o ordinal)
   const numero_reuniao = firstMatch(text, RE_NUMERO_REUNIAO);
 
+  // ─── Bloco de assinatura: coleta signatários (title-case + ALL-CAPS) ─────
+  const signatarios: string[] = [];
+
+  RE_ASSINATURA.lastIndex = 0;
+  let sig: RegExpExecArray | null;
+  while ((sig = RE_ASSINATURA.exec(text)) !== null) {
+    const nome = sig[1].trim();
+    if (nome.length > 4 && !signatarios.includes(nome)) signatarios.push(nome);
+  }
+
+  RE_ASSINATURA_CAPS.lastIndex = 0;
+  let sigCaps: RegExpExecArray | null;
+  while ((sigCaps = RE_ASSINATURA_CAPS.exec(text)) !== null) {
+    const nome = sigCaps[1].trim();
+    if (nome.length > 4 && !signatarios.includes(nome)) signatarios.push(nome);
+  }
+
+  // ─── Unanimidade ──────────────────────────────────────────────────────────
+  RE_UNANIMIDADE.lastIndex = 0;
+  const unanimidade_detectada = RE_UNANIMIDADE.test(text);
+
   // ─── Nomes de diretores: contexto + bloco de assinatura ─────────────────
   const nomes_votacao: string[] = [];
   const nomes_votacao_favor: string[] = [];
   const nomes_votacao_contra: string[] = [];
 
-  // Pattern com direção explícita: "Nome – Favorável/Contrário/Abstenção"
-  RE_VOTO_DIRECAO.lastIndex = 0;
-  let vd: RegExpExecArray | null;
-  while ((vd = RE_VOTO_DIRECAO.exec(text)) !== null) {
-    const nome = vd[1].trim();
-    const tipo = vd[2].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    if (nome.length > 4) {
-      if (!nomes_votacao.includes(nome)) nomes_votacao.push(nome);
-      if (tipo.startsWith("favor") && !nomes_votacao_favor.includes(nome)) {
-        nomes_votacao_favor.push(nome);
-      } else if (!tipo.startsWith("favor") && !nomes_votacao_contra.includes(nome)) {
-        nomes_votacao_contra.push(nome);
+  if (unanimidade_detectada && signatarios.length > 0) {
+    // Unanimidade confirmada: todos os signatários votaram a favor.
+    // Ainda detectamos dissidências explícitas para sobrescrever se necessário.
+    nomes_votacao.push(...signatarios);
+    nomes_votacao_favor.push(...signatarios);
+  } else {
+    // Pattern com direção explícita: "Nome – Favorável/Contrário/Abstenção"
+    RE_VOTO_DIRECAO.lastIndex = 0;
+    let vd: RegExpExecArray | null;
+    while ((vd = RE_VOTO_DIRECAO.exec(text)) !== null) {
+      const nome = vd[1].trim();
+      const tipo = vd[2].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (nome.length > 4) {
+        if (!nomes_votacao.includes(nome)) nomes_votacao.push(nome);
+        if (tipo.startsWith("favor") && !nomes_votacao_favor.includes(nome)) {
+          nomes_votacao_favor.push(nome);
+        } else if (!tipo.startsWith("favor") && !nomes_votacao_contra.includes(nome)) {
+          nomes_votacao_contra.push(nome);
+        }
       }
     }
-  }
 
-  // Padrões A / B / C (frases narrativas — apenas nomes sem direção)
-  for (const pattern of RE_VOTO_CONTEXTO) {
-    pattern.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = pattern.exec(text)) !== null) {
-      const nome = m[1].trim();
-      if (nome.length > 4 && !nomes_votacao.includes(nome)) nomes_votacao.push(nome);
+    // Padrões A / B / C (frases narrativas — apenas nomes sem direção)
+    for (const pattern of RE_VOTO_CONTEXTO) {
+      pattern.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = pattern.exec(text)) !== null) {
+        const nome = m[1].trim();
+        if (nome.length > 4 && !nomes_votacao.includes(nome)) nomes_votacao.push(nome);
+      }
+    }
+
+    // Adiciona signatários ao pool geral se ainda não encontrados
+    for (const nome of signatarios) {
+      if (!nomes_votacao.includes(nome)) nomes_votacao.push(nome);
+    }
+
+    // Fallback: sem direção explícita → todos considerados a favor
+    if (nomes_votacao_favor.length === 0 && nomes_votacao.length > 0) {
+      nomes_votacao_favor.push(...nomes_votacao);
     }
   }
 
-  // Padrão E (bloco de assinatura — padrão ARTESP/SEI)
-  RE_ASSINATURA.lastIndex = 0;
-  let sig: RegExpExecArray | null;
-  while ((sig = RE_ASSINATURA.exec(text)) !== null) {
-    const nome = sig[1].trim();
-    if (nome.length > 4 && !nomes_votacao.includes(nome)) nomes_votacao.push(nome);
-  }
-
-  // Fallback: sem direção explícita → todos considerados a favor (deliberações unânimes)
-  if (nomes_votacao_favor.length === 0 && nomes_votacao.length > 0) {
-    nomes_votacao_favor.push(...nomes_votacao);
+  // ─── Voto dissidente / divergente ─────────────────────────────────────────
+  // Move o diretor dissidente de _favor para _contra (se estava em favor)
+  RE_VOTO_DISSIDENTE.lastIndex = 0;
+  let diss: RegExpExecArray | null;
+  while ((diss = RE_VOTO_DISSIDENTE.exec(text)) !== null) {
+    const nome = diss[1].trim();
+    if (nome.length > 4) {
+      if (!nomes_votacao.includes(nome)) nomes_votacao.push(nome);
+      // Remove de favor e adiciona a contra
+      const idxFavor = nomes_votacao_favor.indexOf(nome);
+      if (idxFavor !== -1) nomes_votacao_favor.splice(idxFavor, 1);
+      if (!nomes_votacao_contra.includes(nome)) nomes_votacao_contra.push(nome);
+    }
   }
 
   return {
@@ -237,6 +286,8 @@ export function extractFields(text: string): ExtractedFields {
     nomes_votacao,
     nomes_votacao_favor,
     nomes_votacao_contra,
+    signatarios,
+    unanimidade_detectada,
   };
 }
 

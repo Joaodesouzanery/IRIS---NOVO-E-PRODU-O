@@ -468,7 +468,7 @@ export default function UploadPage() {
     const dedupReasons: (string | undefined)[] = new Array(allResults.length);
     try {
       const seenHashes = new Set<string>(
-        JSON.parse(sessionStorage.getItem("iris_seen_hashes") ?? "[]")
+        JSON.parse(localStorage.getItem("iris_seen_file_hashes") ?? "[]")
       );
       const localNumbers = new Set<string>(
         getLocalDelibs()
@@ -492,16 +492,16 @@ export default function UploadPage() {
       }
     } catch { /* não crítico */ }
 
-    // Persiste hashes na sessionStorage após dedup
+    // Persiste hashes no localStorage após dedup (persistente entre sessões)
     try {
       const seen: string[] = JSON.parse(
-        sessionStorage.getItem("iris_seen_hashes") ?? "[]"
+        localStorage.getItem("iris_seen_file_hashes") ?? "[]"
       );
       for (const r of allResults) {
         if (r.file_hash && !seen.includes(r.file_hash)) seen.push(r.file_hash);
       }
-      sessionStorage.setItem("iris_seen_hashes", JSON.stringify(seen.slice(-500)));
-    } catch { /* sessionStorage pode estar indisponível */ }
+      localStorage.setItem("iris_seen_file_hashes", JSON.stringify(seen.slice(-1000)));
+    } catch { /* localStorage pode estar indisponível */ }
 
     // Auto-seleciona agência majoritária detectada (só se usuário não selecionou)
     const detectedSiglas = allResults
@@ -571,6 +571,7 @@ export default function UploadPage() {
         nomes_votacao: fields.nomes_votacao,
         nomes_votacao_contra: fields.nomes_votacao_contra ?? [],
         extraction_confidence: item.confidence,
+        extraction_raw: item.extraction_raw,
       };
     });
 

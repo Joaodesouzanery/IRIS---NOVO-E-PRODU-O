@@ -16,8 +16,8 @@ export function DemoBanner() {
         <FlaskConical className="w-4 h-4 shrink-0" />
         <span className="font-medium">Modo Demo</span>
         <span className="text-text-muted font-normal">
-          — Visualizando dados fictícios da ARTESP (25 deliberações, 5 diretores).
-          Configure o Supabase para usar dados reais.
+          — Dados locais da ARTESP (10 deliberações, 4 diretores). PDFs enviados ficam salvos no localStorage.
+          Configure o Supabase para persistência em produção.
         </span>
       </div>
       <button

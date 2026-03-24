@@ -8,10 +8,11 @@
 // ─── IDs fixos ─────────────────────────────────────────────────────────────
 const A_ARTESP = "demo-agency-artesp";
 
-// Diretores ARTESP — nomes reais conforme deliberações jan/2026
+// Diretores ARTESP — nomes reais conforme deliberações 2026
 const DA1 = "demo-dir-artesp-1"; // André Isper Rodrigues Barnabé (Diretor-Presidente)
 const DA2 = "demo-dir-artesp-2"; // Diego Albert Zanatto (Diretor)
 const DA3 = "demo-dir-artesp-3"; // Fernanda Esbízaro Rodrigues Rudnik (Diretora)
+const DA4 = "demo-dir-artesp-4"; // Raquel França Carneiro (Diretora)
 
 // ─── Mapeamento agência → diretores ──────────────────────────────────────
 const AGENCY_DIRS: Record<string, Array<{ id: string; nome: string }>> = {
@@ -19,6 +20,7 @@ const AGENCY_DIRS: Record<string, Array<{ id: string; nome: string }>> = {
     { id: DA1, nome: "André Isper Rodrigues Barnabé" },
     { id: DA2, nome: "Diego Albert Zanatto" },
     { id: DA3, nome: "Fernanda Esbízaro Rodrigues Rudnik" },
+    { id: DA4, nome: "Raquel França Carneiro" },
   ],
 };
 
@@ -101,18 +103,20 @@ export const demoData = {
 
   diretores() {
     return [
-      { id: DA1, nome: "André Isper Rodrigues Barnabé",      agencia_id: A_ARTESP, cargo: "Diretor-Presidente", needs_review: false, ativo: true, created_at: "2023-06-15T10:00:00Z" },
-      { id: DA2, nome: "Diego Albert Zanatto",             agencia_id: A_ARTESP, cargo: "Diretor",            needs_review: false, ativo: true, created_at: "2021-03-10T10:00:00Z" },
-      { id: DA3, nome: "Fernanda Esbízaro Rodrigues Rudnik", agencia_id: A_ARTESP, cargo: "Diretora",         needs_review: false, ativo: true, created_at: "2022-07-22T10:00:00Z" },
+      { id: DA1, nome: "André Isper Rodrigues Barnabé",       agencia_id: A_ARTESP, cargo: "Diretor-Presidente", needs_review: false, ativo: true, created_at: "2023-06-15T10:00:00Z" },
+      { id: DA2, nome: "Diego Albert Zanatto",                agencia_id: A_ARTESP, cargo: "Diretor",            needs_review: false, ativo: true, created_at: "2021-03-10T10:00:00Z" },
+      { id: DA3, nome: "Fernanda Esbízaro Rodrigues Rudnik",  agencia_id: A_ARTESP, cargo: "Diretora",           needs_review: false, ativo: true, created_at: "2022-07-22T10:00:00Z" },
+      { id: DA4, nome: "Raquel França Carneiro",              agencia_id: A_ARTESP, cargo: "Diretora",           needs_review: false, ativo: true, created_at: "2024-01-10T10:00:00Z" },
     ];
   },
 
   mandatos() {
     const now = new Date().toISOString().slice(0, 10);
     const raw = [
-      { id: "demo-m-1", diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",       cargo: "Diretor-Presidente", agencia_id: A_ARTESP, data_inicio: "2023-06-15", data_fim: "2027-06-14" },
+      { id: "demo-m-1", diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",      cargo: "Diretor-Presidente", agencia_id: A_ARTESP, data_inicio: "2023-06-15", data_fim: "2027-06-14" },
       { id: "demo-m-2", diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               cargo: "Diretor",            agencia_id: A_ARTESP, data_inicio: "2021-03-10", data_fim: "2025-03-09" },
       { id: "demo-m-3", diretor_id: DA3, diretor_nome: "Fernanda Esbízaro Rodrigues Rudnik", cargo: "Diretora",           agencia_id: A_ARTESP, data_inicio: "2022-07-22", data_fim: "2026-07-21" },
+      { id: "demo-m-4", diretor_id: DA4, diretor_nome: "Raquel França Carneiro",             cargo: "Diretora",           agencia_id: A_ARTESP, data_inicio: "2024-01-10", data_fim: "2028-01-09" },
     ];
     return raw.map((m) => ({
       ...m,
@@ -180,13 +184,16 @@ export const demoData = {
       .map(([period, temas]) => ({ period, ...Object.fromEntries(temas) }));
   },
 
-  // Hardcoded para evitar recalcular votos a partir do zero.
-  // DA1=André: 8F/2D/0div; DA2=Diego: 9F/1D/1div; DA3=Fernanda: 9F/1D/1div
+  // 10 deliberações × 4 diretores = 40 votos.
+  // Indeferidos: 005 (divergente=DA3) e 010 (divergente=DA2).
+  // DA1=André:   8F/2D/0div=80%; DA2=Diego: 9F/1D/1div=90%;
+  // DA3=Fernanda:9F/1D/1div=90%; DA4=Raquel: 8F/2D/0div=80%
   diretoresOverview(agencia_id?: string | null) {
     const all = [
-      { diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",       agencia: A_ARTESP, total: 10, favoravel: 8,  desfavoravel: 2, divergente: 0, pct_favor: 80.0 },
-      { diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               agencia: A_ARTESP, total: 10, favoravel: 9,  desfavoravel: 1, divergente: 1, pct_favor: 90.0 },
-      { diretor_id: DA3, diretor_nome: "Fernanda Esbízaro Rodrigues Rudnik", agencia: A_ARTESP, total: 10, favoravel: 9,  desfavoravel: 1, divergente: 1, pct_favor: 90.0 },
+      { diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",      agencia: A_ARTESP, total: 10, favoravel: 8, desfavoravel: 2, divergente: 0, pct_favor: 80.0 },
+      { diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               agencia: A_ARTESP, total: 10, favoravel: 9, desfavoravel: 1, divergente: 1, pct_favor: 90.0 },
+      { diretor_id: DA3, diretor_nome: "Fernanda Esbízaro Rodrigues Rudnik", agencia: A_ARTESP, total: 10, favoravel: 9, desfavoravel: 1, divergente: 1, pct_favor: 90.0 },
+      { diretor_id: DA4, diretor_nome: "Raquel França Carneiro",             agencia: A_ARTESP, total: 10, favoravel: 8, desfavoravel: 2, divergente: 0, pct_favor: 80.0 },
     ];
     const filtered = agencia_id ? all.filter((d) => d.agencia === agencia_id) : all;
     return filtered.map(({ agencia: _, ...rest }) => rest).sort((a, b) => b.total - a.total);
@@ -215,30 +222,32 @@ export const demoData = {
 
   votacaoMatrix(agencia_id?: string | null) {
     const all = [
-      { diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",       agencia: A_ARTESP, total: 10, favoravel: 8,  desfavoravel: 2, abstencao: 0, divergente: 0 },
-      { diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               agencia: A_ARTESP, total: 10, favoravel: 9,  desfavoravel: 1, abstencao: 0, divergente: 1 },
-      { diretor_id: DA3, diretor_nome: "Fernanda Esbízaro Rodrigues Rudnik", agencia: A_ARTESP, total: 10, favoravel: 9,  desfavoravel: 1, abstencao: 0, divergente: 1 },
+      { diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",      agencia: A_ARTESP, total: 10, favoravel: 8, desfavoravel: 2, abstencao: 0, divergente: 0 },
+      { diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               agencia: A_ARTESP, total: 10, favoravel: 9, desfavoravel: 1, abstencao: 0, divergente: 1 },
+      { diretor_id: DA3, diretor_nome: "Fernanda Esbízaro Rodrigues Rudnik", agencia: A_ARTESP, total: 10, favoravel: 9, desfavoravel: 1, abstencao: 0, divergente: 1 },
+      { diretor_id: DA4, diretor_nome: "Raquel França Carneiro",             agencia: A_ARTESP, total: 10, favoravel: 8, desfavoravel: 2, abstencao: 0, divergente: 0 },
     ];
     const filtered = agencia_id ? all.filter((d) => d.agencia === agencia_id) : all;
     return filtered.map(({ agencia: _, ...rest }) => rest).sort((a, b) => b.total - a.total);
   },
 
   votacaoDistribution(agencia_id?: string | null) {
-    // 10 deliberações × 3 diretores = 30 votos: 26 Favoravel, 4 Desfavoravel
+    // 10 deliberações × 4 diretores = 40 votos: 34 Favoravel, 6 Desfavoravel
     if (agencia_id && agencia_id !== A_ARTESP) return [
       { tipo_voto: "Favoravel", count: 0, pct: "0" },
     ];
     return [
-      { tipo_voto: "Favoravel",    count: 26, pct: "86.7" },
-      { tipo_voto: "Desfavoravel", count: 4,  pct: "13.3" },
+      { tipo_voto: "Favoravel",    count: 34, pct: "85.0" },
+      { tipo_voto: "Desfavoravel", count: 6,  pct: "15.0" },
     ];
   },
 
   votacaoFidelidade(agencia_id?: string | null) {
     const all = [
-      { diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",       agencia: A_ARTESP, total_votos: 10, votos_nominais: 2, votos_divergentes: 0, taxa_fidelidade: "100.0" },
+      { diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",      agencia: A_ARTESP, total_votos: 10, votos_nominais: 2, votos_divergentes: 0, taxa_fidelidade: "100.0" },
       { diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               agencia: A_ARTESP, total_votos: 10, votos_nominais: 2, votos_divergentes: 1, taxa_fidelidade: "90.0" },
       { diretor_id: DA3, diretor_nome: "Fernanda Esbízaro Rodrigues Rudnik", agencia: A_ARTESP, total_votos: 10, votos_nominais: 2, votos_divergentes: 1, taxa_fidelidade: "90.0" },
+      { diretor_id: DA4, diretor_nome: "Raquel França Carneiro",             agencia: A_ARTESP, total_votos: 10, votos_nominais: 2, votos_divergentes: 0, taxa_fidelidade: "100.0" },
     ];
     const filtered = agencia_id ? all.filter((d) => d.agencia === agencia_id) : all;
     return filtered.map(({ agencia: _, ...rest }) => rest);
@@ -268,6 +277,7 @@ export const demoData = {
       auto_classified: true,
       created_at: `${d.data}T10:00:00Z`,
       votos: _buildVotos(d),
+      raw_extraction: null,
     }));
 
     // Filtros
@@ -305,6 +315,7 @@ export const demoData = {
       extraction_confidence: 0.85, auto_classified: true,
       created_at: `${raw.data}T10:00:00Z`,
       votos: _buildVotos(raw),
+      raw_extraction: null,
     };
   },
 
