@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { demoData } from "@/lib/demo-data";
+import { isLocalMode, getSyncedDelibs } from "@/lib/server/local-data-store";
+import { computeEmpresas } from "@/lib/server/analytics-engine";
 
 function isDemo(req: NextRequest): boolean {
   return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
@@ -16,6 +18,10 @@ export async function GET(req: NextRequest) {
   const microtema = req.nextUrl.searchParams.get("microtema") ?? "";
 
   if (isDemo(req)) {
+    if (isLocalMode()) {
+      return NextResponse.json(computeEmpresas(getSyncedDelibs(), agenciaId));
+    }
+
     let rows = demoData.empresas(agenciaId);
     if (search) rows = rows.filter((e) => e.nome.toLowerCase().includes(search));
     if (microtema) rows = rows.filter((e) => e.microtemas.includes(microtema));

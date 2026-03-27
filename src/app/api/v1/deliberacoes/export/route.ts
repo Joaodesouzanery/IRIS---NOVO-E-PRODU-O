@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { demoData } from "@/lib/demo-data";
+import { isLocalMode, getSyncedDelibs } from "@/lib/server/local-data-store";
+import { computeDelibList } from "@/lib/server/analytics-engine";
 
 function isDemo(req: NextRequest): boolean {
   return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
@@ -27,6 +29,31 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
 
   if (isDemo(req)) {
+    if (isLocalMode()) {
+      const all = computeDelibList(getSyncedDelibs(), { limit: 5000 }).data;
+      const rows = all.map((r: any) =>
+        [
+          escape(r.numero_deliberacao),
+          escape(r.reuniao_ordinaria),
+          escape(r.data_reuniao),
+          escape(r.interessado),
+          escape(r.processo),
+          escape(r.microtema),
+          escape(r.resultado),
+          escape(r.pauta_interna ? "Sim" : "Não"),
+          escape(r.extraction_confidence != null ? `${(r.extraction_confidence * 100).toFixed(0)}%` : ""),
+          escape(r.created_at),
+        ].join(",")
+      );
+      const csv = [HEADERS.join(","), ...rows].join("\n");
+      return new Response(csv, {
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="deliberacoes_local_${new Date().toISOString().slice(0, 10)}.csv"`,
+        },
+      });
+    }
+
     const all = demoData.deliberacoes({ limit: 5000 }).data;
     const rows = all.map((r) =>
       [

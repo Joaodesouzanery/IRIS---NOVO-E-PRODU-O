@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { demoData } from "@/lib/demo-data";
+import { isLocalMode, getSyncedDelibs } from "@/lib/server/local-data-store";
+import { computeMandatos } from "@/lib/server/analytics-engine";
 
 function isDemo(req: NextRequest): boolean {
   return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
@@ -12,9 +14,12 @@ function isDemo(req: NextRequest): boolean {
 
 export async function GET(req: NextRequest) {
   if (isDemo(req)) {
-    const all = demoData.mandatos();
     const statusFilter = req.nextUrl.searchParams.get("status");
     const agenciaId = req.nextUrl.searchParams.get("agencia_id");
+    if (isLocalMode()) {
+      return NextResponse.json(computeMandatos(getSyncedDelibs(), agenciaId, statusFilter));
+    }
+    const all = demoData.mandatos();
     const filtered = all.filter((m) => {
       if (statusFilter && m.status !== statusFilter) return false;
       if (agenciaId && m.agencia_id !== agenciaId) return false;

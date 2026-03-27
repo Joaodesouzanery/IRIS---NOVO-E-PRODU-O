@@ -1,31 +1,61 @@
 "use client";
 
-import { useState } from "react";
-import { FlaskConical, X } from "lucide-react";
+import { FlaskConical, Database } from "lucide-react";
+import { useDataSyncContext } from "@/components/DataSyncProvider";
 
 const IS_DEMO = !process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 export function DemoBanner() {
-  const [dismissed, setDismissed] = useState(false);
+  const { mode, toggleMode, localCount } = useDataSyncContext();
 
-  if (!IS_DEMO || dismissed) return null;
+  if (!IS_DEMO) return null;
+
+  const isLocal = mode === "local";
 
   return (
-    <div className="flex items-center justify-between gap-3 px-4 py-2 bg-brand/10 border-b border-brand/20 text-sm">
-      <div className="flex items-center gap-2 text-brand">
-        <FlaskConical className="w-4 h-4 shrink-0" />
-        <span className="font-medium">Modo Demo</span>
+    <div className="flex items-center justify-between gap-3 px-4 py-2 border-b text-sm"
+      style={{
+        background: isLocal ? "rgba(249,115,22,0.06)" : "rgba(139,92,246,0.06)",
+        borderColor: isLocal ? "rgba(249,115,22,0.15)" : "rgba(139,92,246,0.15)",
+      }}
+    >
+      <div className="flex items-center gap-2">
+        {isLocal ? (
+          <Database className="w-4 h-4 shrink-0 text-brand" />
+        ) : (
+          <FlaskConical className="w-4 h-4 shrink-0 text-violet-400" />
+        )}
+        <span className="font-medium" style={{ color: isLocal ? "var(--brand)" : "rgb(167,139,250)" }}>
+          {isLocal ? "Dados Reais" : "Modo Demo"}
+        </span>
         <span className="text-text-muted font-normal">
-          — Dados locais da ARTESP (10 deliberações, 4 diretores). PDFs enviados ficam salvos no localStorage.
-          Configure o Supabase para persistência em produção.
+          {isLocal
+            ? `— ${localCount} deliberação${localCount !== 1 ? "ões" : ""} via upload (localStorage)`
+            : "— 10 amostras fictícias da ARTESP. Alterne para ver seus dados reais."
+          }
         </span>
       </div>
+
       <button
-        onClick={() => setDismissed(true)}
-        className="text-text-muted hover:text-text-primary transition-colors shrink-0"
-        aria-label="Fechar aviso"
+        onClick={toggleMode}
+        className="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all"
+        style={{
+          background: isLocal ? "rgba(139,92,246,0.1)" : "rgba(249,115,22,0.1)",
+          color: isLocal ? "rgb(167,139,250)" : "var(--brand)",
+          border: `1px solid ${isLocal ? "rgba(139,92,246,0.2)" : "rgba(249,115,22,0.2)"}`,
+        }}
       >
-        <X className="w-4 h-4" />
+        {isLocal ? (
+          <>
+            <FlaskConical className="w-3 h-3" />
+            Ver Demo
+          </>
+        ) : (
+          <>
+            <Database className="w-3 h-3" />
+            Ver Dados Reais
+          </>
+        )}
       </button>
     </div>
   );

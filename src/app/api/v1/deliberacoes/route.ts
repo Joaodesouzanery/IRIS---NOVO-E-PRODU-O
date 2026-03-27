@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { demoData } from "@/lib/demo-data";
+import { isLocalMode, getSyncedDelibs } from "@/lib/server/local-data-store";
+import { computeDelibList } from "@/lib/server/analytics-engine";
 
 const VALID_SORT_COLUMNS = new Set([
   "data_reuniao",
@@ -23,15 +25,27 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
 
   if (isDemo(req)) {
+    const page = parseInt(searchParams.get("page") ?? "1", 10);
+    const limit = parseInt(searchParams.get("limit") ?? "20", 10);
+    const agencia_id = searchParams.get("agencia_id") ?? undefined;
+    const microtema = searchParams.get("microtema") ?? undefined;
+    const resultado = searchParams.get("resultado") ?? undefined;
+    const search = searchParams.get("search") ?? undefined;
+    const year = searchParams.get("year") ?? undefined;
+
+    if (isLocalMode()) {
+      return NextResponse.json(computeDelibList(getSyncedDelibs(), { page, limit, agencia_id, microtema, resultado, search, year }));
+    }
+
     return NextResponse.json(
       demoData.deliberacoes({
-        page: parseInt(searchParams.get("page") ?? "1", 10),
-        limit: parseInt(searchParams.get("limit") ?? "20", 10),
-        agencia_id: searchParams.get("agencia_id") ?? undefined,
-        microtema: searchParams.get("microtema") ?? undefined,
-        resultado: searchParams.get("resultado") ?? undefined,
-        search: searchParams.get("search") ?? undefined,
-        year: searchParams.get("year") ?? undefined,
+        page,
+        limit,
+        agencia_id,
+        microtema,
+        resultado,
+        search,
+        year,
       })
     );
   }

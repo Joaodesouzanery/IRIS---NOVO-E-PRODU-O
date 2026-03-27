@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { demoData } from "@/lib/demo-data";
+import { isLocalMode, getSyncedDelibs } from "@/lib/server/local-data-store";
+import { computeDelibById } from "@/lib/server/analytics-engine";
 
 const ALLOWED_PATCH_FIELDS = new Set([
   "numero_deliberacao",
@@ -28,6 +30,12 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   if (isDemo(req)) {
+    if (isLocalMode()) {
+      const found = computeDelibById(getSyncedDelibs(), params.id);
+      if (!found) return NextResponse.json({ error: "Não encontrada" }, { status: 404 });
+      return NextResponse.json(found);
+    }
+
     const delib = demoData.deliberacaoById(params.id);
     if (!delib) {
       return NextResponse.json({ error: "Deliberação não encontrada" }, { status: 404 });

@@ -6,6 +6,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { demoData } from "@/lib/demo-data";
+import { isLocalMode, getSyncedDelibs } from "@/lib/server/local-data-store";
+import { computeDiretorProfile } from "@/lib/server/analytics-engine";
 import type { DiretorProfile } from "@/types";
 
 const SAFE_ID_RE = /^[a-zA-Z0-9_-]+$/;
@@ -26,6 +28,12 @@ export async function GET(
   }
 
   if (isDemo(req)) {
+    if (isLocalMode()) {
+      const profile = computeDiretorProfile(getSyncedDelibs(), id);
+      if (!profile) return NextResponse.json({ error: "Diretor não encontrado" }, { status: 404 });
+      return NextResponse.json(profile);
+    }
+
     const profile = demoData.diretorProfile(id);
     if (!profile) {
       return NextResponse.json({ error: "Diretor não encontrado" }, { status: 404 });

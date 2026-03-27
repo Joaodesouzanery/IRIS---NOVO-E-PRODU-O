@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type {
@@ -374,6 +374,7 @@ function ReviewCard({
 // ─── Página principal ─────────────────────────────────────────────────────
 
 export default function UploadPage() {
+  const queryClient = useQueryClient();
   const [stage, setStage] = useState<Stage>("queue");
   const [queue, setQueue] = useState<QueuedFile[]>([]);
   const [agenciaId, setAgenciaId] = useState<string>("");
@@ -583,6 +584,15 @@ export default function UploadPage() {
       // Demo mode: persist returned deliberações in localStorage
       if (res.deliberacoes && res.deliberacoes.length > 0) {
         appendLocalDelibs(res.deliberacoes);
+        // Sync updated localStorage to server so dashboards reflect new data
+        try {
+          await fetch("/api/v1/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ deliberacoes: getLocalDelibs(), mode: "local" }),
+          });
+          queryClient.invalidateQueries();
+        } catch { /* sync non-critical */ }
       }
       setConfirmResults(res);
       setStage("done");

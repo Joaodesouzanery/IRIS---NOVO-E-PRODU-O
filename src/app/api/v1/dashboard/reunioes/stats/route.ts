@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { demoData } from "@/lib/demo-data";
+import { isLocalMode, getSyncedDelibs } from "@/lib/server/local-data-store";
+import { computeReunioesStats } from "@/lib/server/analytics-engine";
 
 function isDemo(req: NextRequest): boolean {
   return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
@@ -12,6 +14,10 @@ function isDemo(req: NextRequest): boolean {
 
 export async function GET(req: NextRequest) {
   if (isDemo(req)) {
+    const agenciaId = req.nextUrl.searchParams.get("agencia_id");
+    if (isLocalMode()) {
+      return NextResponse.json(computeReunioesStats(getSyncedDelibs(), agenciaId));
+    }
     return NextResponse.json(demoData.reunioesStats());
   }
 

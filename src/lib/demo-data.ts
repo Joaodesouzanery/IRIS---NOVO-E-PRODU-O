@@ -114,7 +114,7 @@ export const demoData = {
     const now = new Date().toISOString().slice(0, 10);
     const raw = [
       { id: "demo-m-1", diretor_id: DA1, diretor_nome: "André Isper Rodrigues Barnabé",      cargo: "Diretor-Presidente", agencia_id: A_ARTESP, data_inicio: "2023-06-15", data_fim: "2027-06-14" },
-      { id: "demo-m-2", diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               cargo: "Diretor",            agencia_id: A_ARTESP, data_inicio: "2021-03-10", data_fim: "2025-03-09" },
+      { id: "demo-m-2", diretor_id: DA2, diretor_nome: "Diego Albert Zanatto",               cargo: "Diretor",            agencia_id: A_ARTESP, data_inicio: "2021-03-10", data_fim: "2029-03-09" },
       { id: "demo-m-3", diretor_id: DA3, diretor_nome: "Fernanda Esbízaro Rodrigues Rudnik", cargo: "Diretora",           agencia_id: A_ARTESP, data_inicio: "2022-07-22", data_fim: "2026-07-21" },
       { id: "demo-m-4", diretor_id: DA4, diretor_nome: "Raquel França Carneiro",             cargo: "Diretora",           agencia_id: A_ARTESP, data_inicio: "2024-01-10", data_fim: "2028-01-09" },
     ];
