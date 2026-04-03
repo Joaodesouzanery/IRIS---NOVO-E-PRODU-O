@@ -32,7 +32,7 @@ const MESES: Record<string, number> = {
   maio: 5, junho: 6, julho: 7, agosto: 8,
   setembro: 9, outubro: 10, novembro: 11, dezembro: 12,
 };
-const RE_DATA_EXTENSO  = /(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})/gi;
+const RE_DATA_EXTENSO  = /(\d{1,2})\s+de\s+([a-záéíóúâêôãõçàü]+)\s+de\s+(\d{4})/gi;
 const RE_DATA_NUMERICA = /(\d{2})\/(\d{2})\/(\d{4})/g;
 
 // ─── Extração de nomes de diretores ───────────────────────────────────────
@@ -74,16 +74,30 @@ function allMatches(text: string, pattern: RegExp, group = 1): string[] {
   return results;
 }
 
-function parseDataExtenso(text: string): string | null {
-  RE_DATA_EXTENSO.lastIndex = 0;
-  const match = RE_DATA_EXTENSO.exec(text);
-  if (!match) return null;
-  const day   = parseInt(match[1], 10);
+function parseOneDateExtenso(match: RegExpExecArray): string | null {
+  const day     = parseInt(match[1], 10);
   const mesNome = match[2].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const year  = parseInt(match[3], 10);
-  const month = MESES[mesNome];
+  const year    = parseInt(match[3], 10);
+  const month   = MESES[mesNome];
   if (!month || day < 1 || day > 31 || year < 1990 || year > 2099) return null;
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function parseDataExtenso(text: string): string | null {
+  // Primeiro: busca data próxima a contextos de reunião (mais confiável)
+  const RE_DATA_REUNIAO_CTX = /(?:Reuni[aã]o|realizada?\s+em|data\s+da\s+reuni[aã]o|São\s+Paulo,?)\s*[,:]?\s*(\d{1,2})\s+de\s+([a-záéíóúâêôãõçàü]+)\s+de\s+(\d{4})/gi;
+  RE_DATA_REUNIAO_CTX.lastIndex = 0;
+  let m = RE_DATA_REUNIAO_CTX.exec(text);
+  if (m) {
+    const result = parseOneDateExtenso([m[0], m[1], m[2], m[3]] as unknown as RegExpExecArray);
+    if (result) return result;
+  }
+
+  // Fallback: primeira data em extenso encontrada no documento
+  RE_DATA_EXTENSO.lastIndex = 0;
+  m = RE_DATA_EXTENSO.exec(text);
+  if (!m) return null;
+  return parseOneDateExtenso(m);
 }
 
 function parseDataNumerica(text: string): string | null {
@@ -177,8 +191,22 @@ export function extractFields(text: string): ExtractedFields {
     PAUTA_INTERNA_KEYWORDS.some((kw) => textLower.includes(kw));
 
   // Resumo do pleito
-  const RE_RESUMO = /(?:Trata-se[^.]*\.|Resumo[:\s]+|Objeto[:\s]+)([\s\S]{20,500}?)(?=\n\n|\n[A-Z]|$)/i;
-  const resumo_pleito = RE_RESUMO.exec(text)?.[1]?.trim() ?? null;
+  // Captura o parágrafo completo iniciado por marcadores comuns em deliberações brasileiras.
+  // Usa \n\n ou fim de documento como delimitador de parágrafo (sem lookahead agressivo \n[A-Z]).
+  const RE_RESUMO_PRINCIPAL = /(?:Trata-se|Cuida-se|Versa\s+o\s+presente|A\s+presente\s+delibera[çc][aã]o)([\s\S]{30,800}?)(?=\n\n|\f|$)/im;
+  const RE_RESUMO_LABEL     = /(?:Resumo[:\s]+|Objeto[:\s]+|Ementa[:\s]+)([\s\S]{20,600}?)(?=\n\n|\f|$)/im;
+
+  let resumo_pleito: string | null = null;
+  const resumoMatch = RE_RESUMO_LABEL.exec(text) ?? RE_RESUMO_PRINCIPAL.exec(text);
+  if (resumoMatch) {
+    // Para RE_RESUMO_PRINCIPAL o grupo 1 é o texto após o marcador; inclui o marcador para contexto
+    const raw = resumoMatch[0].trim();
+    resumo_pleito = raw.length >= 20 ? raw.slice(0, 800) : null;
+  }
+  // Fallback: se ainda null, usa o campo assunto como resumo curto
+  if (!resumo_pleito && assunto && assunto.length >= 15) {
+    resumo_pleito = assunto;
+  }
 
   // Fundamento da decisão
   const RE_FUNDAMENTO = /(?:Fundamento[:\s]+|Em face do exposto|DECIDE[:\s]+|Decide-se[:\s]+)([\s\S]{20,1000}?)(?=\n\n|\n[A-Z]{3}|$)/i;

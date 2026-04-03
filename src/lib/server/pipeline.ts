@@ -45,8 +45,18 @@ export async function processPdf(jobId: string, agenciaId: string): Promise<void
     }
 
     // NLP: extração de campos
-    const fields = extractFields(extraction.text);
-    const confidence = calcConfidence(fields);
+    let fields = extractFields(extraction.text);
+    let confidence = calcConfidence(fields);
+
+    // IA: fallback para PDFs com baixa confiança (< 0.70)
+    if (confidence < 0.70) {
+      const { extractFieldsWithAI } = await import("@/lib/server/ai-extractor");
+      const aiResult = await extractFieldsWithAI(extraction.text, fields);
+      if (aiResult.ai_used) {
+        fields = aiResult.fields;
+        confidence = calcConfidence(fields);
+      }
+    }
 
     // Classificação de microtema
     const { microtema } = classifyMicrotema(extraction.text);
