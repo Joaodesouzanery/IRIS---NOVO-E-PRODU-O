@@ -233,7 +233,7 @@ export default function DeliberacoesPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                {["Reunião", "Data", "Processo", "Interessado", "Microtema", "Resumo", ""].map((h) => (
+                {["Agência", "Reunião", "Data", "Interessado", "Microtema", "Resumo", ""].map((h) => (
                   <th
                     key={h}
                     className="px-4 py-3 text-left text-label text-text-muted font-mono whitespace-nowrap"
@@ -257,58 +257,94 @@ export default function DeliberacoesPage() {
                   </td>
                 </tr>
               ) : (
-                allDelibs.map((d) => (
-                  <tr
-                    key={d.id}
-                    className="border-b border-border/50 hover:bg-bg-hover transition-colors"
-                  >
-                    <td className="px-4 py-3 font-mono text-xs text-text-secondary whitespace-nowrap">
-                      {d.numero_deliberacao ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-text-secondary whitespace-nowrap">
-                      {formatDate(d.data_reuniao)}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-text-secondary max-w-[180px] truncate">
-                      {d.processo ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-text-primary max-w-[200px] truncate">
-                      {d.interessado ?? "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      {d.microtema ? (
-                        <span className="badge-orange">
-                          {getMicrotemaLabel(d.microtema)}
-                        </span>
-                      ) : (
-                        <span className="text-text-muted text-xs">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-text-muted max-w-[300px]">
-                      <span className="line-clamp-2">
-                        {d.resumo_pleito ?? "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {d.resultado && (
-                          <span className={cn(
-                            "badge",
-                            d.resultado === "Deferido" ? "badge-green" : "badge-red"
-                          )}>
-                            {d.resultado}
+                allDelibs.map((d) => {
+                  const isUnanimous =
+                    Array.isArray(d.votos) &&
+                    d.votos.length > 0 &&
+                    d.votos.every((v) => v.tipo_voto === "Favoravel");
+                  const resultadoPositivo =
+                    d.resultado === "Deferido" ||
+                    d.resultado === "Aprovado" ||
+                    d.resultado === "Aprovado por Unanimidade" ||
+                    d.resultado === "Ratificado" ||
+                    d.resultado === "Autorizado" ||
+                    d.resultado === "Recomendado" ||
+                    d.resultado === "Determinado" ||
+                    d.resultado === "Aprovado com Ressalvas";
+
+                  return (
+                    <tr
+                      key={d.id}
+                      className="border-b border-border/50 hover:bg-bg-hover transition-colors"
+                    >
+                      {/* Agência */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {d.agencia ? (
+                          <span className="text-xs px-2 py-0.5 rounded font-mono font-semibold bg-brand/15 text-brand border border-brand/25">
+                            {d.agencia.sigla}
                           </span>
+                        ) : (
+                          <span className="text-text-muted text-xs font-mono">—</span>
                         )}
-                        <Link
-                          href={`/dashboard/deliberacoes/${d.id}`}
-                          className="text-text-muted hover:text-brand transition-colors"
-                          aria-label="Ver detalhes"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      {/* Reunião / Nº deliberação */}
+                      <td className="px-4 py-3 font-mono text-xs text-text-secondary whitespace-nowrap">
+                        {d.numero_deliberacao ?? "—"}
+                      </td>
+                      {/* Data */}
+                      <td className="px-4 py-3 font-mono text-xs text-text-secondary whitespace-nowrap">
+                        {formatDate(d.data_reuniao)}
+                      </td>
+                      {/* Interessado */}
+                      <td className="px-4 py-3 text-sm text-text-primary max-w-[200px] truncate">
+                        {d.interessado ?? "—"}
+                      </td>
+                      {/* Microtema */}
+                      <td className="px-4 py-3">
+                        {d.microtema ? (
+                          <span className="badge-orange">
+                            {getMicrotemaLabel(d.microtema)}
+                          </span>
+                        ) : (
+                          <span className="text-text-muted text-xs">—</span>
+                        )}
+                      </td>
+                      {/* Resumo */}
+                      <td className="px-4 py-3 text-xs text-text-muted max-w-[280px]">
+                        <span className="line-clamp-2">
+                          {d.resumo_pleito ?? "—"}
+                        </span>
+                      </td>
+                      {/* Resultado + ações */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {isUnanimous && (
+                            <span className="text-xs px-1.5 py-0.5 rounded font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 whitespace-nowrap">
+                              Unanimidade
+                            </span>
+                          )}
+                          {d.resultado && (
+                            <span className={cn(
+                              "badge whitespace-nowrap",
+                              resultadoPositivo ? "badge-green" :
+                              d.resultado === "Indeferido" ? "badge-red" :
+                              "text-xs px-2 py-0.5 rounded font-mono bg-zinc-500/15 text-zinc-400 border border-zinc-500/25"
+                            )}>
+                              {d.resultado}
+                            </span>
+                          )}
+                          <Link
+                            href={`/dashboard/deliberacoes/${d.id}`}
+                            className="text-text-muted hover:text-brand transition-colors"
+                            aria-label="Ver detalhes"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

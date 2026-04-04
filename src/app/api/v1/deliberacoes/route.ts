@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
       `id, numero_deliberacao, reuniao_ordinaria, data_reuniao,
        interessado, processo, microtema, resultado, pauta_interna,
        extraction_confidence, agencia_id, created_at,
+       agencias (sigla, nome),
        votos (id, tipo_voto, is_divergente, diretor_id,
          diretores (nome))`,
       { count: "exact" }
@@ -116,6 +117,8 @@ export async function GET(req: NextRequest) {
 
   const formatted = (data ?? []).map((d: any) => ({
     ...d,
+    agencia: d.agencias ?? null,
+    agencias: undefined,
     votos: (d.votos ?? []).map((v: any) => ({
       id: v.id,
       tipo_voto: v.tipo_voto,
