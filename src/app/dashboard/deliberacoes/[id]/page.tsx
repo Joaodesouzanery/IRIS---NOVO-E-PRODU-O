@@ -7,7 +7,7 @@ import type { Deliberacao } from "@/types";
 import { formatDate, getMicrotemaLabel, cn } from "@/lib/utils";
 import {
   ArrowLeft, CheckCircle, XCircle, Pencil, Save, X,
-  ChevronDown, ChevronUp, Users, FileText, ShieldCheck,
+  ChevronDown, ChevronUp, Users, FileText, ShieldCheck, Award,
 } from "lucide-react";
 import Link from "next/link";
 import { getLocalDelibs, updateLocalDelib } from "@/lib/local-store";
@@ -181,20 +181,33 @@ export default function DeliberacaoDetailPage({ params }: { params: { id: string
             </h1>
           )}
 
-          {/* Sub-header: reunião + resultado */}
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
+          {/* Assunto — manchete da deliberação */}
+          {deliberacao.assunto && (
+            <p className="text-sm text-text-secondary mt-1 leading-snug">
+              {deliberacao.assunto}
+            </p>
+          )}
+
+          {/* Sub-header: agência + reunião + resultado + pauta */}
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            {/* Agência badge */}
+            {deliberacao.agencia && (
+              <span className="text-xs px-2 py-0.5 rounded font-mono font-semibold bg-brand/15 text-brand border border-brand/25">
+                {deliberacao.agencia.sigla}
+              </span>
+            )}
             {deliberacao.reuniao_ordinaria && (
               <span className="text-xs text-text-muted font-mono">
                 {deliberacao.reuniao_ordinaria}
               </span>
             )}
-            {deliberacao.reuniao_ordinaria && deliberacao.resultado && (
-              <span className="text-text-muted text-xs">·</span>
-            )}
             {deliberacao.resultado && (
-              <span className={cn("text-xs font-medium", resultadoColor(deliberacao.resultado))}>
-                {deliberacao.resultado}
-              </span>
+              <>
+                <span className="text-text-muted text-xs">·</span>
+                <span className={cn("text-xs font-medium", resultadoColor(deliberacao.resultado))}>
+                  {deliberacao.resultado}
+                </span>
+              </>
             )}
             {/* Pauta badge */}
             <span className={cn(
@@ -293,6 +306,18 @@ export default function DeliberacaoDetailPage({ params }: { params: { id: string
             )}
           </Field>
 
+          <Field label="Assunto">
+            {editing ? (
+              <input className="input text-sm w-full"
+                value={(form as Deliberacao).assunto ?? ""}
+                onChange={(e) => set("assunto" as keyof Deliberacao, e.target.value || null)}
+                placeholder="Assunto / tema da deliberação"
+              />
+            ) : (
+              <p className="text-sm text-text-primary">{deliberacao.assunto ?? "—"}</p>
+            )}
+          </Field>
+
           <Field label="Microtema">
             {editing ? (
               <select className="select w-full text-sm" value={form.microtema ?? ""}
@@ -372,6 +397,17 @@ export default function DeliberacaoDetailPage({ params }: { params: { id: string
             </span>
           )}
         </div>
+
+        {/* Banner de unanimidade */}
+        {deliberacao.votos && deliberacao.votos.length > 0 &&
+          deliberacao.votos.every((v) => v.tipo_voto === "Favoravel") && (
+          <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+            <Award className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="text-xs font-medium text-emerald-400">
+              Aprovado por unanimidade — todos os {deliberacao.votos.length} diretores votaram a favor
+            </span>
+          </div>
+        )}
 
         {deliberacao.votos && deliberacao.votos.length > 0 ? (
           <div className="space-y-2">

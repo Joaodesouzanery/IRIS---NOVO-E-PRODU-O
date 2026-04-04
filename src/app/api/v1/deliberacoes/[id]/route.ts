@@ -13,6 +13,7 @@ const ALLOWED_PATCH_FIELDS = new Set([
   "reuniao_ordinaria",
   "data_reuniao",
   "interessado",
+  "assunto",
   "processo",
   "microtema",
   "resultado",
@@ -48,7 +49,7 @@ export async function GET(
   const { data, error } = await db
     .from("deliberacoes")
     .select(
-      `*, votos (id, tipo_voto, is_divergente, is_nominal, diretor_id,
+      `*, agencias (sigla, nome), votos (id, tipo_voto, is_divergente, is_nominal, diretor_id,
         diretores (nome))`
     )
     .eq("id", params.id)
@@ -60,6 +61,8 @@ export async function GET(
 
   const formatted = {
     ...data,
+    agencia: data.agencias ?? null,
+    agencias: undefined,
     votos: (data.votos ?? []).map((v: any) => ({
       id: v.id,
       tipo_voto: v.tipo_voto,

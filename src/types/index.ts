@@ -70,6 +70,7 @@ export interface Deliberacao {
   pauta_interna: boolean;
   data_reuniao: string | null;
   agencia_id: string | null;
+  agencia?: { sigla: string; nome: string } | null;
   auto_classified: boolean;
   extraction_confidence: number | null;
   created_at: string;
