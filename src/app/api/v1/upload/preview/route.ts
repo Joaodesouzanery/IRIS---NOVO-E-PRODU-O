@@ -151,6 +151,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         ? (allAgencias.find((a) => a.sigla === agencia_sigla_detected)?.id ?? null)
         : null;
 
+      // Verificação de duplicata semântica por numero_deliberacao (produção apenas)
+      // Complementa a deduplicação por hash SHA-256 (detecta re-scans/watermarks diferentes)
+      let semantic_duplicate = false;
+      if (db && fields.numero_deliberacao && agencia_id_detected && !is_duplicate) {
+        const { data: existingDelib } = await db
+          .from("deliberacoes")
+          .select("id")
+          .eq("numero_deliberacao", fields.numero_deliberacao)
+          .eq("agencia_id", agencia_id_detected)
+          .maybeSingle();
+        if (existingDelib) {
+          semantic_duplicate = true;
+        }
+      }
+
       results.push({
         filename: file.name,
         status: confidence >= 0.5 ? "ok" : "low_confidence",
@@ -173,7 +188,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         page_count: extraction.pageCount,
         chars_per_page: extraction.charsPerPage,
         file_hash,
-        is_duplicate,
+        is_duplicate: is_duplicate || semantic_duplicate,
         duplicate_job_id,
         agencia_id_detected,
         agencia_sigla_detected,
@@ -199,6 +214,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           page_count: extraction.pageCount,
           chars_per_page: extraction.charsPerPage,
           agencia_sigla_detected,
+          semantic_duplicate,
         },
       });
     }

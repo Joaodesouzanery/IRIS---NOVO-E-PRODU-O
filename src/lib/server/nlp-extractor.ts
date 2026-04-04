@@ -1,8 +1,12 @@
 /**
  * nlp-extractor.ts
- * Extrai campos estruturados de texto de deliberações usando regex.
- * Suporta o padrão real das deliberações ARTESP:
- *   - Verbos decisórios: RATIFICA, APROVA, RECOMENDA, DETERMINA, AUTORIZA
+ * Extrai campos estruturados de texto de deliberações usando regex + varredura linha a linha.
+ * Estratégia de dois estágios por campo:
+ *   1. Regex globais cobrindo múltiplos rótulos e formatos
+ *   2. Varredura linha a linha (extractLabeledFields) como segunda tentativa
+ *
+ * Suporta o padrão real das deliberações ARTESP e outras agências:
+ *   - Verbos decisórios: RATIFICA, APROVA, RECOMENDA, DETERMINA, AUTORIZA, HOMOLOGA, etc.
  *   - Assinaturas de diretores em bloco ao final do documento
  *   - Campo "Assunto:" presente em todas as deliberações
  * Mantém retrocompatibilidade com padrão DEFERIDO/INDEFERIDO de outras agências.
@@ -11,13 +15,19 @@
 // ─── Regex patterns ────────────────────────────────────────────────────────
 const RE_DELIBERACAO = /DELIBERA[ÇC][AÃ]O\s*N[ºo°]?\s*([\d\.]+)/gi;
 const RE_REUNIAO     = /(\d{3,4})[ªa°º]?\s*(?:Reuni[aã]o\s*)?(?:Ordin[aá]ria|Extraordin[aá]ria)/gi;
-const RE_PROCESSO    = /(?:SEI[!]?\s*n[ºo°°]?|Processo\s*(?:SEI)?\s*n[ºo°°]?)\s*([\d\.\/\-]+)/gi;
-const RE_INTERESSADO = /(?:Interessado[:\s]+|Requerente[:\s]+|Empresa[:\s]+)([^\n]{3,100})/gi;
+
+// Processo: SEI, PA, Processo Adm., Proc. nº, Autos nº, Procedimento nº
+const RE_PROCESSO = /(?:SEI[!]?\s*n[ºo°]?|Processo\s*(?:SEI\s*)?n[ºo°]?|PA\s*n[ºo°]?|Proc(?:esso)?\s*(?:Adm(?:inistrativo)?\s*)?n[ºo°]?|Procedimento\s*n[ºo°]?|Autos?\s*n[ºo°]?)\s*([\d\.\/\-]+)/gi;
+
+// Interessado: 13 rótulos cobrindo terminologia de todas as agências reguladoras
+const RE_INTERESSADO = /(?:Interessad[ao][:\s]+|Requerente[:\s]+|Empresa[:\s]+|Solicitante[:\s]+|Demandante[:\s]+|Concession[aá]ri[ao][:\s]+|Permission[aá]ri[ao][:\s]+|Peticion[aá]rio[:\s]+|Proponente[:\s]+|Benefici[aá]ri[ao][:\s]+|Outorgad[ao][:\s]+|Postulante[:\s]+|Requerida[:\s]+)([^\n]{3,200})/gi;
+
 const RE_ASSUNTO     = /Assunto[:\s]+([^\n]{3,300})/gi;
 
 // Captura verbos de decisão reais das deliberações brasileiras.
+// Inclui verbos extras: HOMOLOGA, ARQUIVA, ANULA, REVOGA, CANCELA, PREJUDICA.
 // Prioridade de normalização definida em normalizeResultado().
-const RE_RESULTADO = /\b(DEFERIDO|INDEFERIDO|DEFERIMENTO|INDEFERIMENTO|PARCIALMENTE\s*DEFERIDO|RETIRADO\s*DE\s*PAUTA|RATIFICA(?:DO)?|APROVA(?:DO)?(?:\s*COM\s*RESSALVAS)?|RECOMENDA(?:DO)?|DETERMINA(?:DO)?|AUTORIZA(?:DO)?)\b/gi;
+const RE_RESULTADO = /\b(DEFERIDO|INDEFERIDO|DEFERIMENTO|INDEFERIMENTO|PARCIALMENTE\s*DEFERIDO|RETIRADO\s*DE\s*PAUTA|RATIFICA(?:DO)?|APROVA(?:DO)?(?:\s*COM\s*RESSALVAS)?|RECOMENDA(?:DO)?|DETERMINA(?:DO)?|AUTORIZA(?:DO)?|HOMOLOGA(?:DO)?|ARQUIVA(?:DO)?|ANULA(?:DO)?|REVOGA(?:DO)?|CANCELA(?:DO)?|PREJUDICA(?:DO)?)\b/gi;
 
 // Unanimidade — qualquer das frases comuns em deliberações brasileiras
 const RE_UNANIMIDADE = /(?:por\s+unanimidade(?:\s+d[eo]s?\s+(?:votos?|presentes?))?|unanimidade\s+d[eo]s?\s+votos?|unanimidade\s+d[eo]s?\s+presentes?|aprovad[oa]\s+(?:pelos?\s+presentes?\s+)?por\s+unanimidade)/gi;
@@ -32,8 +42,10 @@ const MESES: Record<string, number> = {
   maio: 5, junho: 6, julho: 7, agosto: 8,
   setembro: 9, outubro: 10, novembro: 11, dezembro: 12,
 };
-const RE_DATA_EXTENSO  = /(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})/gi;
+const RE_DATA_EXTENSO  = /(\d{1,2})\s+de\s+([a-záéíóúâêôãõçàü]+)\s+de\s+(\d{4})/gi;
 const RE_DATA_NUMERICA = /(\d{2})\/(\d{2})\/(\d{4})/g;
+// Data numérica próxima a contexto de reunião (mais confiável que a primeira data do documento)
+const RE_DATA_NUMERICA_CTX = /(?:Reuni[aã]o|realizada?\s+em|São\s+Paulo)\s*[,:]?\s*(\d{2})\/(\d{2})\/(\d{4})/gi;
 
 // ─── Extração de nomes de diretores ───────────────────────────────────────
 // Padrões A/B/C: contexto de voto em frases narrativas
@@ -64,6 +76,33 @@ function firstMatch(text: string, pattern: RegExp, group = 1): string | null {
   return match ? match[group].trim() : null;
 }
 
+// ─── Extrator linha a linha (segunda estratégia) ──────────────────────────
+// Faz varredura linha a linha buscando padrão "Rótulo: Valor".
+// Mais tolerante a variações de espaçamento/pontuação que regex de largura fixa.
+const LABEL_PATTERNS: [string, RegExp][] = [
+  ["interessado", /^(?:Interessad[ao]|Requerente|Empresa|Solicitante|Concession[aá]ri[ao]|Outorgad[ao]|Peticion[aá]rio|Proponente|Benefici[aá]ri[ao]|Permission[aá]ri[ao]|Demandante|Postulante|Requerida)\s*:/i],
+  ["processo",    /^(?:SEI[!]?|Processo(?:\s*SEI)?|PA|Proc(?:esso)?(?:\s*Adm(?:inistrativo)?)?)\s*n[ºo°]?\s*(?:[:–]|$)/i],
+  ["assunto",     /^(?:Assunto|Ementa|Tema)\s*:/i],
+  ["resultado",   /^(?:Resultado|Decis[aã]o)\s*:/i],
+];
+
+function extractLabeledFields(text: string): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.length < 4) continue;
+    for (const [key, re] of LABEL_PATTERNS) {
+      if (map.has(key)) continue;
+      if (re.test(trimmed)) {
+        // Remove o rótulo + separadores e pega o valor restante
+        const value = trimmed.replace(re, "").replace(/^[\s:–\-]+/, "").trim();
+        if (value.length >= 3) map.set(key, value.slice(0, 250));
+      }
+    }
+  }
+  return map;
+}
+
 function allMatches(text: string, pattern: RegExp, group = 1): string[] {
   pattern.lastIndex = 0;
   const results: string[] = [];
@@ -74,27 +113,53 @@ function allMatches(text: string, pattern: RegExp, group = 1): string[] {
   return results;
 }
 
-function parseDataExtenso(text: string): string | null {
-  RE_DATA_EXTENSO.lastIndex = 0;
-  const match = RE_DATA_EXTENSO.exec(text);
-  if (!match) return null;
-  const day   = parseInt(match[1], 10);
+function parseOneDateExtenso(match: RegExpExecArray): string | null {
+  const day     = parseInt(match[1], 10);
   const mesNome = match[2].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const year  = parseInt(match[3], 10);
-  const month = MESES[mesNome];
+  const year    = parseInt(match[3], 10);
+  const month   = MESES[mesNome];
   if (!month || day < 1 || day > 31 || year < 1990 || year > 2099) return null;
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+function parseDataExtenso(text: string): string | null {
+  // Primeiro: busca data próxima a contextos de reunião (mais confiável)
+  const RE_DATA_REUNIAO_CTX = /(?:Reuni[aã]o|realizada?\s+em|data\s+da\s+reuni[aã]o|São\s+Paulo,?)\s*[,:]?\s*(\d{1,2})\s+de\s+([a-záéíóúâêôãõçàü]+)\s+de\s+(\d{4})/gi;
+  RE_DATA_REUNIAO_CTX.lastIndex = 0;
+  let m = RE_DATA_REUNIAO_CTX.exec(text);
+  if (m) {
+    const result = parseOneDateExtenso([m[0], m[1], m[2], m[3]] as unknown as RegExpExecArray);
+    if (result) return result;
+  }
+
+  // Fallback: primeira data em extenso encontrada no documento
+  RE_DATA_EXTENSO.lastIndex = 0;
+  m = RE_DATA_EXTENSO.exec(text);
+  if (!m) return null;
+  return parseOneDateExtenso(m);
+}
+
+function parseOneDateNumerica(d: string, m: string, y: string): string | null {
+  const day   = parseInt(d, 10);
+  const month = parseInt(m, 10);
+  const year  = parseInt(y, 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1990 || year > 2099) return null;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 function parseDataNumerica(text: string): string | null {
+  // Primeiro: data numérica próxima a contexto de reunião
+  RE_DATA_NUMERICA_CTX.lastIndex = 0;
+  const ctxMatch = RE_DATA_NUMERICA_CTX.exec(text);
+  if (ctxMatch) {
+    const result = parseOneDateNumerica(ctxMatch[1], ctxMatch[2], ctxMatch[3]);
+    if (result) return result;
+  }
+  // Fallback: primeira data numérica do documento
   RE_DATA_NUMERICA.lastIndex = 0;
   const match = RE_DATA_NUMERICA.exec(text);
   if (!match) return null;
-  const day   = parseInt(match[1], 10);
-  const month = parseInt(match[2], 10);
-  const year  = parseInt(match[3], 10);
-  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1990 || year > 2099) return null;
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  return parseOneDateNumerica(match[1], match[2], match[3]);
 }
 
 function normalizeResultado(raw: string): string | null {
@@ -111,6 +176,13 @@ function normalizeResultado(raw: string): string | null {
   if (upper.startsWith("RECOMENDA")) return "Recomendado";
   if (upper.startsWith("DETERMINA")) return "Determinado";
   if (upper.startsWith("AUTORIZA"))  return "Autorizado";
+  // Verbos extras mapeados para valores do schema existente
+  if (upper.startsWith("HOMOLOGA"))  return "Aprovado";          // homologação = aprovação
+  if (upper.startsWith("ARQUIVA"))   return "Retirado de Pauta"; // arquivamento = sem decisão de mérito
+  if (upper.startsWith("ANULA"))     return "Indeferido";         // anulação ~ indeferimento
+  if (upper.startsWith("REVOGA"))    return "Indeferido";
+  if (upper.startsWith("CANCELA"))   return "Retirado de Pauta";
+  if (upper.startsWith("PREJUDICA")) return "Retirado de Pauta";
   return null;
 }
 
@@ -138,9 +210,23 @@ export interface ExtractedFields {
 export function extractFields(text: string): ExtractedFields {
   const numero_deliberacao = firstMatch(text, RE_DELIBERACAO);
   const reuniao_ordinaria  = firstMatch(text, RE_REUNIAO);
-  const interessado        = firstMatch(text, RE_INTERESSADO);
-  const processo           = firstMatch(text, RE_PROCESSO);
-  const assunto            = firstMatch(text, RE_ASSUNTO);
+
+  // Estágio 1: regex globais
+  let interessado = firstMatch(text, RE_INTERESSADO);
+  let processo    = firstMatch(text, RE_PROCESSO);
+  // Assunto: tenta "Assunto:" → "Ementa:" → "Tema:"
+  let assunto =
+    firstMatch(text, RE_ASSUNTO) ??
+    firstMatch(text, /Ementa[:\s]+([^\n]{3,300})/gi) ??
+    firstMatch(text, /Tema[:\s]+([^\n]{3,300})/gi);
+
+  // Estágio 2: varredura linha a linha para campos ainda null
+  if (!interessado || !processo || !assunto) {
+    const labeled = extractLabeledFields(text);
+    if (!interessado && labeled.has("interessado")) interessado = labeled.get("interessado")!;
+    if (!processo    && labeled.has("processo"))    processo    = labeled.get("processo")!;
+    if (!assunto     && labeled.has("assunto"))     assunto     = labeled.get("assunto")!;
+  }
 
   // Data: tenta extenso primeiro ("12 de janeiro de 2026"), depois numérico
   const data_reuniao = parseDataExtenso(text) ?? parseDataNumerica(text);
@@ -177,11 +263,24 @@ export function extractFields(text: string): ExtractedFields {
     PAUTA_INTERNA_KEYWORDS.some((kw) => textLower.includes(kw));
 
   // Resumo do pleito
-  const RE_RESUMO = /(?:Trata-se[^.]*\.|Resumo[:\s]+|Objeto[:\s]+)([\s\S]{20,500}?)(?=\n\n|\n[A-Z]|$)/i;
-  const resumo_pleito = RE_RESUMO.exec(text)?.[1]?.trim() ?? null;
+  // Estratégia 1: seção com rótulo explícito (Resumo:, Objeto:, Ementa:)
+  // Estratégia 2: parágrafo iniciado por marcador narrativo (Trata-se, Cuida-se, etc.)
+  const RE_RESUMO_LABEL = /(?:Resumo[:\s]+|Objeto[:\s]+)([\s\S]{20,600}?)(?=\n\n|\f|$)/im;
+  const RE_RESUMO_PRINCIPAL = /(?:Trata-se|Cuida-se|Versa\s+o\s+presente|A\s+presente\s+delibera[çc][aã]o|O\s+presente\s+(?:caso|processo|requerimento|pedido)|A\s+empresa\s+requer|O\s+requerente\s+solicita|Refere-se\s+ao?\s+requerimento)([\s\S]{30,800}?)(?=\n\n|\f|$)/im;
 
-  // Fundamento da decisão
-  const RE_FUNDAMENTO = /(?:Fundamento[:\s]+|Em face do exposto|DECIDE[:\s]+|Decide-se[:\s]+)([\s\S]{20,1000}?)(?=\n\n|\n[A-Z]{3}|$)/i;
+  let resumo_pleito: string | null = null;
+  const resumoMatch = RE_RESUMO_LABEL.exec(text) ?? RE_RESUMO_PRINCIPAL.exec(text);
+  if (resumoMatch) {
+    const raw = resumoMatch[0].trim();
+    resumo_pleito = raw.length >= 20 ? raw.slice(0, 800) : null;
+  }
+  // Fallback: usa o campo assunto como resumo curto
+  if (!resumo_pleito && assunto && assunto.length >= 15) {
+    resumo_pleito = assunto;
+  }
+
+  // Fundamento da decisão: marcadores expandidos para cobrir ARTESP e outras agências
+  const RE_FUNDAMENTO = /(?:Fundamento[:\s]+|Em face do exposto|Considerando\s+o\s+exposto|Diante\s+do\s+exposto|Pelo\s+exposto|Tendo\s+em\s+vista[^,\n]{0,30},\s*decide[:\s]+|DECIDE\s+A\s+DIRETORIA[:\s]+|A\s+DIRETORIA(?:\s+DA\s+\w+)?\s+DECIDE[:\s]+|DECIDE[:\s]+|Decide-se[:\s]+|RESOLVE[:\s]+)([\s\S]{20,1000}?)(?=\n\n|\n[A-Z]{3}|$)/i;
   const fundamento_decisao = RE_FUNDAMENTO.exec(text)?.[1]?.trim() ?? null;
 
   // Número da reunião (apenas o ordinal)
@@ -291,17 +390,19 @@ export function extractFields(text: string): ExtractedFields {
   };
 }
 
-// ─── Confiança de extração ────────────────────────────────────────────────
+// ─── Confiança de extração (ponderada) ───────────────────────────────────
+// Pesos refletem a importância de cada campo para identificar a deliberação.
+// Soma dos pesos = 1.0 quando todos os campos estão presentes.
 export function calcConfidence(fields: ExtractedFields): number {
-  const checks = [
-    fields.numero_deliberacao !== null,
-    fields.reuniao_ordinaria !== null,
-    fields.data_reuniao !== null,
-    fields.interessado !== null,
-    fields.processo !== null,
-    fields.resultado !== null,
-    fields.resumo_pleito !== null,
-    fields.fundamento_decisao !== null,
+  const weights: [boolean, number][] = [
+    [fields.numero_deliberacao !== null, 0.22], // campo identificador central
+    [fields.data_reuniao       !== null, 0.18], // data sempre presente em deliberações
+    [fields.resultado          !== null, 0.18], // decisão final
+    [fields.interessado        !== null, 0.14], // quem fez o requerimento
+    [fields.assunto            !== null, 0.12], // tema da deliberação
+    [fields.processo           !== null, 0.10], // número do processo SEI
+    [fields.resumo_pleito      !== null, 0.04], // resumo do pleito
+    [fields.fundamento_decisao !== null, 0.02], // fundamento jurídico
   ];
-  return checks.filter(Boolean).length / checks.length;
+  return weights.reduce((sum, [present, weight]) => sum + (present ? weight : 0), 0);
 }

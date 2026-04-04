@@ -88,7 +88,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="flex flex-col w-60 min-h-screen bg-bg-sidebar border-r border-border shrink-0">
+    <aside className="flex flex-col w-60 h-screen sticky top-0 bg-bg-sidebar border-r border-border shrink-0">
       {/* Logo / Agency Selector */}
       <div className="p-4 border-b border-border">
         <button className="flex items-center justify-between w-full px-3 py-2.5 rounded-md bg-bg-card border border-border hover:border-brand/30 transition-colors group">
