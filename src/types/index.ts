@@ -258,6 +258,50 @@ export interface EmpresaStats {
   microtemas: string[];
   microtema_principal: string | null;
   agencia_id: string | null;
+  risco_regulatorio?: "alto" | "medio" | "baixo";
+  tendencia_direcao?: "melhorando" | "estavel" | "piorando";
+}
+
+export interface EmpresaDetalhe {
+  nome: string;
+  total_deliberacoes: number;
+  deferidos: number;
+  indeferidos: number;
+  pct_deferido: number;
+  ultima_deliberacao: string | null;
+  agencia_id: string | null;
+  risco_regulatorio: "alto" | "medio" | "baixo";
+  tendencia: {
+    pct_anterior: number;
+    pct_recente: number;
+    direcao: "melhorando" | "estavel" | "piorando";
+  };
+  evolucao_mensal: Array<{
+    period: string;
+    total: number;
+    positivo: number;
+    negativo: number;
+  }>;
+  microtemas_breakdown: Array<{ microtema: string; count: number }>;
+  diretores: Array<{
+    id: string;
+    nome: string;
+    total: number;
+    favoravel: number;
+    pct_favoravel: number;
+  }>;
+  historico: Deliberacao[];
+  alertas: string[];
+}
+
+export interface Alerta {
+  id: string;
+  tipo: "empresa_risco" | "tema_emergente" | "diretor_divergente";
+  severity: "high" | "medium" | "low";
+  titulo: string;
+  mensagem: string;
+  entidade: string;
+  created_at: string;
 }
 
 // ─── Upload Preview / Confirm ─────────────────────────────────────────────

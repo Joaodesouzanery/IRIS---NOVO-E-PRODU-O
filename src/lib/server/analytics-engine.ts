@@ -13,6 +13,29 @@ function filterByAgencia(delibs: Deliberacao[], agenciaId?: string | null): Deli
   return agenciaId ? delibs.filter((d) => d.agencia_id === agenciaId) : delibs;
 }
 
+/** Resultados considerados positivos para fins de risco regulatório. */
+function isResultadoPositivo(resultado: string | null): boolean {
+  if (!resultado) return false;
+  return [
+    "Deferido", "Aprovado", "Aprovado com Ressalvas", "Aprovado por Unanimidade",
+    "Ratificado", "Autorizado", "Recomendado", "Determinado",
+  ].includes(resultado);
+}
+
+/** YYYY-MM-DD para N dias atrás. */
+function isoDateDaysAgo(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** YYYY-MM para N meses atrás. */
+function isoMonthAgo(months: number): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - months);
+  return d.toISOString().slice(0, 7);
+}
+
 function allVotos(delibs: Deliberacao[]): Array<VotoEmbutido & { delib: Deliberacao }> {
   const result: Array<VotoEmbutido & { delib: Deliberacao }> = [];
   for (const d of delibs) {
@@ -551,37 +574,256 @@ export function computeDiretorProfile(delibs: Deliberacao[], dirId: string) {
 export function computeEmpresas(delibs: Deliberacao[], agenciaId?: string | null) {
   const rows = filterByAgencia(delibs, agenciaId).filter((d) => d.interessado);
   const map = new Map<string, {
-    total: number; deferido: number; indeferido: number;
-    ultima: string; microtemas: Set<string>; agencia: string;
+    delibs: Deliberacao[];
+    microtemas: Set<string>;
+    agencia: string;
   }>();
 
   for (const d of rows) {
     if (!d.interessado) continue;
     if (!map.has(d.interessado)) {
-      map.set(d.interessado, { total: 0, deferido: 0, indeferido: 0, ultima: "", microtemas: new Set(), agencia: d.agencia_id ?? "" });
+      map.set(d.interessado, { delibs: [], microtemas: new Set(), agencia: d.agencia_id ?? "" });
     }
     const s = map.get(d.interessado)!;
-    s.total++;
-    if (d.resultado === "Deferido") s.deferido++;
-    else if (d.resultado === "Indeferido") s.indeferido++;
-    if (!s.ultima || (d.data_reuniao ?? "") > s.ultima) s.ultima = d.data_reuniao ?? "";
+    s.delibs.push(d);
     if (d.microtema) s.microtemas.add(d.microtema);
   }
 
   return [...map.entries()]
     .map(([nome, s]) => {
       const microtemas = [...s.microtemas];
+      const total = s.delibs.length;
+      const deferido = s.delibs.filter((d) => isResultadoPositivo(d.resultado)).length;
+      const indeferido = s.delibs.filter((d) => d.resultado === "Indeferido").length;
+      const pct_deferido = total > 0 ? (deferido / total) * 100 : 0;
+      const ultima = s.delibs
+        .map((d) => d.data_reuniao ?? "")
+        .filter(Boolean)
+        .sort()
+        .at(-1) ?? "";
+
+      // Tendência: primeira vs segunda metade do histórico
+      const sorted = [...s.delibs].sort((a, b) => (a.data_reuniao ?? "").localeCompare(b.data_reuniao ?? ""));
+      const mid = Math.floor(sorted.length / 2);
+      const ant = sorted.slice(0, mid);
+      const rec = sorted.slice(mid);
+      const pct_ant = ant.length > 0 ? (ant.filter((d) => isResultadoPositivo(d.resultado)).length / ant.length) * 100 : pct_deferido;
+      const pct_rec = rec.length > 0 ? (rec.filter((d) => isResultadoPositivo(d.resultado)).length / rec.length) * 100 : pct_deferido;
+      const diff = pct_rec - pct_ant;
+      const tendencia_direcao: "melhorando" | "estavel" | "piorando" =
+        diff > 5 ? "melhorando" : diff < -5 ? "piorando" : "estavel";
+
+      const risco_regulatorio: "alto" | "medio" | "baixo" =
+        pct_deferido < 40 ? "alto" : pct_deferido < 70 ? "medio" : "baixo";
+
       return {
         nome,
-        total_deliberacoes: s.total,
-        deferidos: s.deferido,
-        indeferidos: s.indeferido,
-        pct_deferido: s.total > 0 ? (s.deferido / s.total) * 100 : 0,
-        ultima_deliberacao: s.ultima || null,
+        total_deliberacoes: total,
+        deferidos: deferido,
+        indeferidos: indeferido,
+        pct_deferido,
+        ultima_deliberacao: ultima || null,
         microtemas,
         microtema_principal: microtemas[0] ?? null,
         agencia_id: s.agencia,
+        risco_regulatorio,
+        tendencia_direcao,
       };
     })
     .sort((a, b) => b.total_deliberacoes - a.total_deliberacoes);
+}
+
+// ─── 20. computeEmpresaDetalhe ───────────────────────────────────────────────
+
+export function computeEmpresaDetalhe(delibs: Deliberacao[], empresaNome: string) {
+  const rows = delibs.filter((d) => d.interessado === empresaNome);
+  if (rows.length === 0) return null;
+
+  const total = rows.length;
+  const deferidos = rows.filter((d) => isResultadoPositivo(d.resultado)).length;
+  const indeferidos = rows.filter((d) => d.resultado === "Indeferido").length;
+  const pct_deferido = total > 0 ? (deferidos / total) * 100 : 0;
+
+  const ultima = rows
+    .map((d) => d.data_reuniao ?? "")
+    .filter(Boolean)
+    .sort()
+    .at(-1) ?? null;
+
+  // Risco regulatório
+  const risco_regulatorio: "alto" | "medio" | "baixo" =
+    pct_deferido < 40 ? "alto" : pct_deferido < 70 ? "medio" : "baixo";
+
+  // Tendência: metade mais antiga vs. metade mais recente
+  const sorted = [...rows].sort((a, b) => (a.data_reuniao ?? "").localeCompare(b.data_reuniao ?? ""));
+  const mid = Math.floor(sorted.length / 2);
+  const ant = sorted.slice(0, mid);
+  const rec = sorted.slice(mid);
+  const pct_anterior = ant.length > 0 ? (ant.filter((d) => isResultadoPositivo(d.resultado)).length / ant.length) * 100 : pct_deferido;
+  const pct_recente = rec.length > 0 ? (rec.filter((d) => isResultadoPositivo(d.resultado)).length / rec.length) * 100 : pct_deferido;
+  const diff = pct_recente - pct_anterior;
+  const direcao: "melhorando" | "estavel" | "piorando" =
+    diff > 5 ? "melhorando" : diff < -5 ? "piorando" : "estavel";
+
+  // Evolução mensal
+  const byMonth = new Map<string, { total: number; positivo: number; negativo: number }>();
+  for (const d of rows) {
+    const period = (d.data_reuniao ?? "").slice(0, 7);
+    if (!period) continue;
+    if (!byMonth.has(period)) byMonth.set(period, { total: 0, positivo: 0, negativo: 0 });
+    const s = byMonth.get(period)!;
+    s.total++;
+    if (isResultadoPositivo(d.resultado)) s.positivo++;
+    else if (d.resultado === "Indeferido") s.negativo++;
+  }
+  const evolucao_mensal = [...byMonth.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([period, s]) => ({ period, ...s }));
+
+  // Microtemas breakdown
+  const microtemaCount = new Map<string, number>();
+  for (const d of rows) {
+    const m = d.microtema ?? "outros";
+    microtemaCount.set(m, (microtemaCount.get(m) ?? 0) + 1);
+  }
+  const microtemas_breakdown = [...microtemaCount.entries()]
+    .map(([microtema, count]) => ({ microtema, count }))
+    .sort((a, b) => b.count - a.count);
+
+  // Diretores que votaram em deliberações desta empresa
+  const dirMap = new Map<string, { id: string; nome: string; total: number; favoravel: number }>();
+  for (const d of rows) {
+    for (const v of d.votos ?? []) {
+      if (!v.diretor_id) continue;
+      if (!dirMap.has(v.diretor_id)) {
+        dirMap.set(v.diretor_id, { id: v.diretor_id, nome: v.diretor_nome ?? v.diretor_id, total: 0, favoravel: 0 });
+      }
+      const dir = dirMap.get(v.diretor_id)!;
+      dir.total++;
+      if (v.tipo_voto === "Favoravel") dir.favoravel++;
+    }
+  }
+  const diretores = [...dirMap.values()]
+    .map((d) => ({ ...d, pct_favoravel: d.total > 0 ? (d.favoravel / d.total) * 100 : 0 }))
+    .sort((a, b) => b.total - a.total);
+
+  // Alertas ativos
+  const alertas: string[] = [];
+  const iso90 = isoDateDaysAgo(90);
+  const negativas90 = rows.filter((d) => d.resultado === "Indeferido" && (d.data_reuniao ?? "") >= iso90).length;
+  if (negativas90 >= 2) alertas.push(`${negativas90} indeferimentos nos últimos 90 dias`);
+  if (risco_regulatorio === "alto" && total >= 3) alertas.push("Taxa de aprovação abaixo de 40%");
+  if (direcao === "piorando" && total >= 4) alertas.push("Tendência de queda na taxa de aprovação");
+
+  return {
+    nome: empresaNome,
+    total_deliberacoes: total,
+    deferidos,
+    indeferidos,
+    pct_deferido,
+    ultima_deliberacao: ultima,
+    agencia_id: rows[0].agencia_id ?? null,
+    risco_regulatorio,
+    tendencia: { pct_anterior, pct_recente, direcao },
+    evolucao_mensal,
+    microtemas_breakdown,
+    diretores,
+    historico: rows.sort((a, b) => (b.data_reuniao ?? "").localeCompare(a.data_reuniao ?? "")),
+    alertas,
+  };
+}
+
+// ─── 21. computeAlertas ──────────────────────────────────────────────────────
+
+export function computeAlertas(delibs: Deliberacao[], agenciaId?: string | null) {
+  const rows = filterByAgencia(delibs, agenciaId);
+  const alertas: Array<{
+    id: string;
+    tipo: "empresa_risco" | "tema_emergente" | "diretor_divergente";
+    severity: "high" | "medium" | "low";
+    titulo: string;
+    mensagem: string;
+    entidade: string;
+    created_at: string;
+  }> = [];
+
+  const now = new Date().toISOString();
+  const iso90 = isoDateDaysAgo(90);
+
+  // ── 1. Empresas com ≥ 3 indeferimentos nos últimos 90 dias ────────────
+  const empresaNeg = new Map<string, number>();
+  for (const d of rows) {
+    if (d.resultado === "Indeferido" && (d.data_reuniao ?? "") >= iso90 && d.interessado) {
+      empresaNeg.set(d.interessado, (empresaNeg.get(d.interessado) ?? 0) + 1);
+    }
+  }
+  for (const [empresa, count] of empresaNeg) {
+    if (count >= 3) {
+      alertas.push({
+        id: `empresa_risco_${empresa.slice(0, 30).replace(/\s+/g, "_")}`,
+        tipo: "empresa_risco",
+        severity: "high",
+        titulo: "Empresa em risco regulatório",
+        mensagem: `${empresa} recebeu ${count} indeferimentos nos últimos 90 dias`,
+        entidade: empresa,
+        created_at: now,
+      });
+    }
+  }
+
+  // ── 2. Tema emergente: crescimento > 20% no último trimestre ──────────
+  const iso3m = isoMonthAgo(3);
+  const iso6m = isoMonthAgo(6);
+  const temaRec = new Map<string, number>();
+  const temaAnt = new Map<string, number>();
+
+  for (const d of rows) {
+    const period = (d.data_reuniao ?? "").slice(0, 7);
+    const tema = d.microtema;
+    if (!period || !tema) continue;
+    if (period >= iso3m) temaRec.set(tema, (temaRec.get(tema) ?? 0) + 1);
+    else if (period >= iso6m) temaAnt.set(tema, (temaAnt.get(tema) ?? 0) + 1);
+  }
+
+  for (const [tema, countRec] of temaRec) {
+    const countAnt = temaAnt.get(tema) ?? 0;
+    if (countAnt > 0 && countRec >= 3) {
+      const crescimento = ((countRec - countAnt) / countAnt) * 100;
+      if (crescimento > 20) {
+        alertas.push({
+          id: `tema_emergente_${tema}`,
+          tipo: "tema_emergente",
+          severity: "medium",
+          titulo: "Tema em crescimento",
+          mensagem: `Microtema "${tema}" cresceu ${crescimento.toFixed(0)}% no último trimestre (${countAnt} → ${countRec})`,
+          entidade: tema,
+          created_at: now,
+        });
+      }
+    }
+  }
+
+  // ── 3. Diretor com divergência > 30% (mínimo 5 votos) ────────────────
+  const dirStats = computeVotacaoMatrix(rows);
+  for (const dir of dirStats) {
+    if (dir.total >= 5) {
+      const pctDiv = (dir.divergente / dir.total) * 100;
+      if (pctDiv > 30) {
+        alertas.push({
+          id: `diretor_divergente_${dir.diretor_id}`,
+          tipo: "diretor_divergente",
+          severity: "medium",
+          titulo: "Perfil divergente ativo",
+          mensagem: `${dir.diretor_nome} votou divergentemente em ${pctDiv.toFixed(1)}% dos casos (${dir.divergente}/${dir.total})`,
+          entidade: dir.diretor_id,
+          created_at: now,
+        });
+      }
+    }
+  }
+
+  return alertas.sort((a, b) => {
+    const order = { high: 0, medium: 1, low: 2 };
+    return order[a.severity] - order[b.severity];
+  });
 }

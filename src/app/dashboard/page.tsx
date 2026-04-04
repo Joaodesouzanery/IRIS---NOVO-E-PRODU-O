@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { DashboardOverview, MicrotemaStats, DiretorOverviewItem, Agencia } from "@/types";
+import type { DashboardOverview, MicrotemaStats, DiretorOverviewItem, Agencia, Alerta } from "@/types";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { IrisBarChart } from "@/components/charts/IrisBarChart";
 import { IrisPieChart } from "@/components/charts/IrisPieChart";
@@ -48,6 +48,11 @@ export default function DashboardPage() {
   const { data: reunioes = [] } = useQuery({
     queryKey: ["dashboard", "reunioes-stats", agenciaId],
     queryFn: () => api.get<ReunioesStats[]>(`/dashboard/reunioes/stats${agenciaParam}`),
+  });
+
+  const { data: alertas = [] } = useQuery({
+    queryKey: ["alertas", agenciaId],
+    queryFn: () => api.get<Alerta[]>(`/alertas${agenciaParam}`),
   });
 
   // ── Chart data ────────────────────────────────────────────────────────
@@ -374,6 +379,73 @@ export default function DashboardPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Alertas Inteligentes ──────────────────────────────────────── */}
+      {alertas.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <p className="section-label">Alertas Regulatórios</p>
+              <span className={cn(
+                "text-xs px-2 py-0.5 rounded-full font-mono border",
+                alertas.some((a) => a.severity === "high")
+                  ? "bg-red-500/15 text-red-400 border-red-500/25"
+                  : "bg-amber-500/15 text-amber-400 border-amber-500/25"
+              )}>
+                {alertas.length}
+              </span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {alertas.map((alerta) => {
+              const isHigh = alerta.severity === "high";
+              const href =
+                alerta.tipo === "empresa_risco"
+                  ? `/dashboard/empresas/${encodeURIComponent(alerta.entidade)}`
+                  : alerta.tipo === "diretor_divergente"
+                  ? `/dashboard/mandatos/${alerta.entidade}`
+                  : null;
+
+              return (
+                <div
+                  key={alerta.id}
+                  className={cn(
+                    "flex items-start gap-3 px-4 py-3 rounded-lg border",
+                    isHigh
+                      ? "bg-red-500/10 border-red-500/20"
+                      : "bg-amber-500/10 border-amber-500/20"
+                  )}
+                >
+                  <AlertTriangle className={cn(
+                    "w-4 h-4 shrink-0 mt-0.5",
+                    isHigh ? "text-red-400" : "text-amber-400"
+                  )} />
+                  <div className="flex-1 min-w-0">
+                    <p className={cn(
+                      "text-xs font-semibold",
+                      isHigh ? "text-red-300" : "text-amber-300"
+                    )}>
+                      {alerta.titulo}
+                    </p>
+                    <p className="text-xs text-text-muted mt-0.5">{alerta.mensagem}</p>
+                  </div>
+                  {href && (
+                    <Link
+                      href={href}
+                      className={cn(
+                        "text-xs shrink-0 hover:underline",
+                        isHigh ? "text-red-400" : "text-amber-400"
+                      )}
+                    >
+                      Ver →
+                    </Link>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Evolução Temporal */}
       {reunioes.length > 0 && (
