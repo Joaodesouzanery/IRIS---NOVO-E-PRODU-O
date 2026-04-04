@@ -140,23 +140,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
 
       // NLP
-      let fields = extractFields(extraction.text);
+      const fields = extractFields(extraction.text);
       const { microtema } = classifyMicrotema(extraction.text);
-      let confidence = calcConfidence(fields);
+      const confidence = calcConfidence(fields);
       const pauta_interna = fields.pauta_interna || classifyPautaInterna(extraction.text);
-
-      // IA: fallback para PDFs com baixa confiança (< 0.70)
-      let ai_used = false;
-      let ai_error: string | undefined;
-      if (confidence < 0.70) {
-        const { extractFieldsWithAI } = await import("@/lib/server/ai-extractor");
-        const aiResult = await extractFieldsWithAI(extraction.text, fields);
-        fields = aiResult.fields;
-        ai_used = aiResult.ai_used;
-        ai_error = aiResult.ai_error;
-        // Recalcula confiança após enriquecimento com IA
-        confidence = calcConfidence(fields);
-      }
 
       // Detecção de agência
       const agencia_sigla_detected = detectAgenciaSigla(extraction.text, siglas);
@@ -227,8 +214,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           page_count: extraction.pageCount,
           chars_per_page: extraction.charsPerPage,
           agencia_sigla_detected,
-          ai_used,
-          ai_error,
           semantic_duplicate,
         },
       });
