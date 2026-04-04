@@ -6,7 +6,7 @@ import type { EmpresaDetalhe } from "@/types";
 import { cn, formatDate, getMicrotemaLabel, getMicrotemaColor } from "@/lib/utils";
 import {
   ArrowLeft, Building, AlertTriangle, TrendingUp, TrendingDown,
-  Minus, CheckCircle, XCircle, Users, BarChart3, ExternalLink,
+  Minus, CheckCircle, XCircle, Users, ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { IrisBarChart } from "@/components/charts/IrisBarChart";
@@ -88,6 +88,7 @@ export default function EmpresaDetailPage({ params }: { params: { id: string } }
 
   const evolucaoData = empresa.evolucao_mensal.map((m) => ({
     name: m.period.slice(5) + "/" + m.period.slice(2, 4),
+    value: m.positivo,
     positivo: m.positivo,
     negativo: m.negativo,
   }));
@@ -191,21 +192,18 @@ export default function EmpresaDetailPage({ params }: { params: { id: string } }
 
       {/* ── Evolução mensal ──────────────────────────────────────────────── */}
       {evolucaoData.length > 1 && (
-        <div className="card">
-          <div className="flex items-center gap-2 mb-4">
-            <BarChart3 className="w-4 h-4 text-brand" />
-            <p className="section-label">Evolução Mensal</p>
-          </div>
-          <ChartWrapper height={160}>
+        <ChartWrapper title="Evolução Mensal" availableTypes={["bar"]} defaultType="bar">
+          {() => (
             <IrisBarChart
               data={evolucaoData}
               multibar={[
                 { key: "positivo", label: "Aprovados", color: "#22c55e" },
                 { key: "negativo", label: "Indeferidos", color: "#ef4444" },
               ]}
+              height={160}
             />
-          </ChartWrapper>
-        </div>
+          )}
+        </ChartWrapper>
       )}
 
       {/* ── Microtemas e Diretores ───────────────────────────────────────── */}
