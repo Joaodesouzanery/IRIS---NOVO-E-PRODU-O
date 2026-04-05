@@ -193,7 +193,7 @@ export default function MandatosPage() {
   }));
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       <ModuleTabs tabs={DIRETORES_TABS} />
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
@@ -309,7 +309,7 @@ export default function MandatosPage() {
           <div className="card">
             <h3 className="section-label mb-3">Distribuição por Tipo de Decisão</h3>
             {decisaoPieData.length > 0 ? (
-              <IrisPieChart data={decisaoPieData} height={220} innerRadius={55} />
+              <IrisPieChart data={decisaoPieData} height={180} innerRadius={55} />
             ) : (
               <div className="h-[220px] flex items-center justify-center text-text-muted text-sm">Sem dados</div>
             )}
@@ -317,7 +317,7 @@ export default function MandatosPage() {
           <div className="card">
             <h3 className="section-label mb-3">Distribuição de Votos</h3>
             {pieData.length > 0 ? (
-              <IrisPieChart data={pieData} height={220} innerRadius={55} />
+              <IrisPieChart data={pieData} height={180} innerRadius={55} />
             ) : (
               <div className="h-[220px] flex items-center justify-center text-text-muted text-sm">Sem dados</div>
             )}
@@ -334,7 +334,7 @@ export default function MandatosPage() {
             {consensoBarData.length > 0 ? (
               <IrisBarChart
                 data={consensoBarData}
-                height={220}
+                height={180}
                 multibar={[
                   { key: "consenso", color: "#22c55e", label: "Consenso" },
                   { key: "divergente", color: "#ef4444", label: "Divergente" },
@@ -348,7 +348,7 @@ export default function MandatosPage() {
           <div className="card">
             <h3 className="section-label mb-3">Participações por Diretor</h3>
             {participacoesData.length > 0 ? (
-              <IrisBarChart data={participacoesData} height={220} color="#f97316" horizontal />
+              <IrisBarChart data={participacoesData} height={180} color="#f97316" horizontal />
             ) : (
               <div className="h-[220px] flex items-center justify-center text-text-muted text-sm">Sem dados</div>
             )}
@@ -361,7 +361,7 @@ export default function MandatosPage() {
               data={setoresData}
               horizontal
               useMicrotemaColors
-              height={240}
+              height={200}
               formatLabel={getMicrotemaLabel}
             />
           ) : (
@@ -382,7 +382,7 @@ export default function MandatosPage() {
                 { key: "deferido", color: "#22c55e", label: "Deferidos" },
                 { key: "indeferido", color: "#ef4444", label: "Indeferidos" },
               ]}
-              height={260}
+              height={180}
             />
           ) : (
             <div className="h-[260px] flex items-center justify-center text-text-muted text-sm">Sem dados</div>

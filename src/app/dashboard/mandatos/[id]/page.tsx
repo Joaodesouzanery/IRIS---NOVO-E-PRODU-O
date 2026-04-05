@@ -112,7 +112,7 @@ export default function DiretorProfilePage() {
   ].filter((d) => d.value > 0);
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       {/* Back */}
       <Link
         href="/dashboard/mandatos"
@@ -259,7 +259,7 @@ export default function DiretorProfilePage() {
           </div>
           <div className="card">
             <p className="section-label mb-2">Distribuição de Votos</p>
-            <IrisPieChart data={pieData} height={200} innerRadius={50} />
+            <IrisPieChart data={pieData} height={165} innerRadius={50} />
           </div>
         </div>
       </section>
@@ -421,7 +421,7 @@ export default function DiretorProfilePage() {
           <div className="card">
             <IrisBarChart
               data={monthlyTimeline}
-              height={220}
+              height={180}
               xKey="name"
               multibar={[
                 { key: "favoravel",    color: "#22c55e", label: "Favorável" },

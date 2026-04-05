@@ -170,7 +170,7 @@ export default function GovernancaPage() {
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       <ModuleTabs tabs={ANALISE_TABS} />
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
@@ -269,7 +269,7 @@ export default function GovernancaPage() {
                   value: e.count,
                 }))}
                 total={concentracao.total}
-                height={200}
+                height={165}
                 colorKey="brand"
               />
             </div>
@@ -327,12 +327,12 @@ export default function GovernancaPage() {
           defaultType="area"
         >
           {(type) => {
-            if (type === "bar") return <IrisBarChart data={scoreEvolution.map((e) => ({ name: e.name, value: e.score }))} height={240} />;
+            if (type === "bar") return <IrisBarChart data={scoreEvolution.map((e) => ({ name: e.name, value: e.score }))} height={165} />;
             return (
               <IrisAreaChart
                 data={scoreEvolution.map((e) => ({ name: e.name, score: e.score }))}
                 areas={[{ key: "score", color: "#f97316", label: "Score" }]}
-                height={240}
+                height={165}
               />
             );
           }}

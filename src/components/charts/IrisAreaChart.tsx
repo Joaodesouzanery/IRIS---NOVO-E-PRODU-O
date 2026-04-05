@@ -16,7 +16,7 @@ interface IrisAreaChartProps {
   height?: number;
 }
 
-export function IrisAreaChart({ data, areas, height = 220 }: IrisAreaChartProps) {
+export function IrisAreaChart({ data, areas, height = 180 }: IrisAreaChartProps) {
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data} margin={{ left: 0, right: 16, top: 4, bottom: 4 }}>

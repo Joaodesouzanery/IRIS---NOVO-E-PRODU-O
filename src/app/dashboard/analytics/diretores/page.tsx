@@ -168,7 +168,7 @@ export default function AnalyticsDiretoresPage() {
   const RADAR_COLORS = CHART_COLORS;
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       <ModuleTabs tabs={DIRETORES_TABS} />
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
@@ -241,8 +241,8 @@ export default function AnalyticsDiretoresPage() {
         {(type) => {
           if (loadDelibs) return <div className="h-48 flex items-center justify-center text-text-muted text-sm">Carregando...</div>;
           if (!diversidadeData.length) return <div className="h-48 flex items-center justify-center text-text-muted text-sm">Sem dados</div>;
-          if (type === "bar") return <IrisBarChart data={diversidadeData} horizontal height={240} />;
-          return <IrisPieChart data={diversidadeData.map((d, i) => ({ ...d, color: CHART_COLORS[i % CHART_COLORS.length] }))} height={240} showLegend />;
+          if (type === "bar") return <IrisBarChart data={diversidadeData} horizontal height={200} />;
+          return <IrisPieChart data={diversidadeData.map((d, i) => ({ ...d, color: CHART_COLORS[i % CHART_COLORS.length] }))} height={200} showLegend />;
         }}
       </ChartWrapper>
 

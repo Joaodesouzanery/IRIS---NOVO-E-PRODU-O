@@ -54,7 +54,7 @@ export default function AnalyticsPage() {
   }));
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       <ModuleTabs tabs={ANALISE_TABS} />
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>

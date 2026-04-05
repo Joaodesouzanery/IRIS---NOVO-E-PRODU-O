@@ -23,7 +23,7 @@ export default function InsightsPage() {
   const totalDivergentes = (matrix ?? []).reduce((s, r) => s + r.divergente, 0);
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       <ModuleTabs tabs={ANALISE_TABS} />
       <div>
         <h1 className="text-xl font-semibold text-text-primary">Insights Competitivos</h1>

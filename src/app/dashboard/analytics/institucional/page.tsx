@@ -26,7 +26,7 @@ export default function AnalyticsInstitucionalPage() {
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in max-w-2xl">
+    <div className="space-y-5 animate-fade-in max-w-2xl">
       <div>
         <h1 className="text-xl font-semibold text-text-primary">Analytics Institucional</h1>
         <p className="text-sm text-text-muted mt-1">

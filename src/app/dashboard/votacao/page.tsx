@@ -40,7 +40,7 @@ export default function VotacaoPage() {
   }));
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       <ModuleTabs tabs={DIRETORES_TABS} />
       <div>
         <h1 className="text-xl font-semibold text-text-primary">Votação</h1>
@@ -54,7 +54,7 @@ export default function VotacaoPage() {
         {/* Distribuição por tipo */}
         <div className="card col-span-1">
           <p className="section-label mb-3">Distribuição de Votos</p>
-          <IrisPieChart data={pieData} height={200} innerRadius={55} />
+          <IrisPieChart data={pieData} height={165} innerRadius={55} />
           <div className="mt-3 space-y-1.5">
             {(distribution ?? []).map((d) => (
               <div key={d.tipo_voto} className="flex items-center justify-between">

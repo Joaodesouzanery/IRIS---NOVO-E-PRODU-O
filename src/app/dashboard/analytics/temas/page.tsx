@@ -119,7 +119,7 @@ export default function AnalyticsTemasPage() {
   const mesesTrend   = evolucao.length;
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       <ModuleTabs tabs={ANALISE_TABS} />
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
@@ -175,9 +175,9 @@ export default function AnalyticsTemasPage() {
         {(type) => {
           if (loadAnalytics) return <div className="h-56 flex items-center justify-center text-text-muted text-sm">Carregando...</div>;
           if (!evolucao.length) return <div className="h-56 flex items-center justify-center text-text-muted text-sm">Sem dados de tendência</div>;
-          if (type === "area") return <IrisAreaChart data={trendAreaData} areas={trendAreas} height={240} />;
-          if (type === "line") return <IrisLineChart data={trendAreaData} lines={trendLines} height={240} />;
-          return <IrisBarChart data={trendAreaData.map((d) => ({ name: d.name, value: d.total }))} height={240} />;
+          if (type === "area") return <IrisAreaChart data={trendAreaData} areas={trendAreas} height={200} />;
+          if (type === "line") return <IrisLineChart data={trendAreaData} lines={trendLines} height={200} />;
+          return <IrisBarChart data={trendAreaData.map((d) => ({ name: d.name, value: d.total }))} height={200} />;
         }}
       </ChartWrapper>
 
@@ -191,15 +191,15 @@ export default function AnalyticsTemasPage() {
         {(type) => {
           if (loadMicro) return <div className="h-56 flex items-center justify-center text-text-muted text-sm">Carregando...</div>;
           if (!microSorted.length) return <div className="h-56 flex items-center justify-center text-text-muted text-sm">Sem dados</div>;
-          if (type === "bar") return <IrisBarChart data={microBarData} horizontal height={280} />;
-          if (type === "pie") return <IrisPieChart data={microPieData} height={280} showLegend />;
+          if (type === "bar") return <IrisBarChart data={microBarData} horizontal height={200} />;
+          if (type === "pie") return <IrisPieChart data={microPieData} height={200} showLegend />;
           // area: % acumulado
           const cumData = microSorted.map((m, i) => ({
             name: getMicrotemaLabel(m.microtema),
             pct: Math.round((m.total / totalDelibs) * 100),
             total: microSorted.slice(0, i + 1).reduce((s, x) => s + x.total, 0),
           }));
-          return <IrisAreaChart data={cumData} areas={[{ key: "pct", color: "#f97316", label: "% do total" }]} height={280} />;
+          return <IrisAreaChart data={cumData} areas={[{ key: "pct", color: "#f97316", label: "% do total" }]} height={200} />;
         }}
       </ChartWrapper>
 

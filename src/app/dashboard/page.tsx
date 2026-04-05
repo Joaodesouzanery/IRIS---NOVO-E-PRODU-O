@@ -100,7 +100,7 @@ export default function DashboardPage() {
   const diretoresAtivos = [...(diretores ?? [])].sort((a, b) => b.total - a.total).slice(0, 4);
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       <ModuleTabs tabs={DELIBERACOES_TABS} />
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
@@ -232,7 +232,7 @@ export default function DashboardPage() {
             className="col-span-2"
           >
             {(type) => {
-              if (type === "pie") return <IrisPieChart data={microtemasPieData} height={200} showLegend />;
+              if (type === "pie") return <IrisPieChart data={microtemasPieData} height={165} showLegend />;
               if (type === "area") return (
                 <IrisAreaChart
                   data={microtemasAreaData}
@@ -240,14 +240,14 @@ export default function DashboardPage() {
                     { key: "deferido",   color: "#22c55e", label: "Deferido" },
                     { key: "indeferido", color: "#ef4444", label: "Indeferido" },
                   ]}
-                  height={200}
+                  height={165}
                 />
               );
               return (
                 <IrisBarChart
                   data={microtemasBarData}
                   horizontal
-                  height={200}
+                  height={165}
                   formatLabel={getMicrotemaLabel}
                 />
               );
@@ -488,7 +488,7 @@ export default function DashboardPage() {
                     { key: "indeferido", color: "#ef4444", label: "Indeferido" },
                   ]}
                   xKey="name"
-                  height={220}
+                  height={180}
                 />
               );
               return (
@@ -498,7 +498,7 @@ export default function DashboardPage() {
                     { key: "deferido",   color: "#22c55e", label: "Deferido" },
                     { key: "indeferido", color: "#ef4444", label: "Indeferido" },
                   ]}
-                  height={220}
+                  height={180}
                 />
               );
             }}

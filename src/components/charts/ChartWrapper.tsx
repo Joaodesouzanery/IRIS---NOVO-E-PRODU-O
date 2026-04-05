@@ -43,7 +43,7 @@ export function ChartWrapper({
 
   return (
     <div className={cn("card overflow-hidden", className)}>
-      <div className="flex items-start justify-between mb-3 gap-2">
+      <div className="flex items-start justify-between mb-2 gap-2">
         <div className="min-w-0">
           <p className="text-sm font-medium text-text-primary leading-tight">{title}</p>
           {subtitle && <p className="text-xs text-text-muted mt-0.5">{subtitle}</p>}

@@ -48,7 +48,7 @@ export function IrisBarChart({
   xKey = "name",
   color = "#f97316",
   useMicrotemaColors = false,
-  height = 220,
+  height = 180,
   horizontal = false,
   formatLabel,
   multibar,

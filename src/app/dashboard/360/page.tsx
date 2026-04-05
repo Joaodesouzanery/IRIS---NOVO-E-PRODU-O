@@ -252,7 +252,7 @@ export default function Dashboard360Page() {
 
   return (
     <div
-      className="space-y-6 animate-fade-in"
+      className="space-y-5 animate-fade-in"
       onClick={() => { if (openPref) setOpenPref(null); }}
     >
       <ModuleTabs tabs={ANALISE_TABS} />
@@ -366,7 +366,7 @@ export default function Dashboard360Page() {
             <ChartSettingsMenu chartId="area-evolucao" />
           </div>
           {areaData.length > 0 ? (
-            <IrisAreaChart data={areaData} areas={areaAreas} height={220} />
+            <IrisAreaChart data={areaData} areas={areaAreas} height={180} />
           ) : (
             <p className="text-sm text-text-muted text-center py-12">Sem dados</p>
           )}
@@ -380,7 +380,7 @@ export default function Dashboard360Page() {
           {pieResultados.length > 0 ? (
             <IrisPieChart
               data={pieResultados}
-              height={220}
+              height={180}
               innerRadius={prefs("pie-resultados").innerRadius ?? 50}
               showLegend={prefs("pie-resultados").showLegend !== false}
             />
@@ -456,7 +456,7 @@ export default function Dashboard360Page() {
           {votePieData.length > 0 ? (
             <IrisPieChart
               data={votePieData}
-              height={220}
+              height={180}
               innerRadius={prefs("pie-votos").innerRadius ?? 60}
               showLegend={prefs("pie-votos").showLegend !== false}
             />

@@ -36,7 +36,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 
 export function IrisPieChart({
   data,
-  height = 220,
+  height = 180,
   innerRadius = 58,
   showLegend = true,
   showTotal = false,

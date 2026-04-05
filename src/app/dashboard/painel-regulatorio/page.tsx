@@ -140,7 +140,7 @@ export default function PainelRegulatorioPage() {
   );
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       <ModuleTabs tabs={REGULATORIO_TABS} />
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
@@ -240,7 +240,7 @@ export default function PainelRegulatorioPage() {
         <div className="card">
           <p className="text-sm font-medium text-text-secondary mb-3">Deliberações por Categoria Regulatória</p>
           {pieData.length > 0 ? (
-            <IrisPieChart data={pieData} height={240} innerRadius={50} showLegend />
+            <IrisPieChart data={pieData} height={200} innerRadius={50} showLegend />
           ) : (
             <p className="text-sm text-text-muted text-center py-12">Sem dados</p>
           )}
@@ -276,7 +276,7 @@ export default function PainelRegulatorioPage() {
             <IrisAreaChart
               data={areaData}
               areas={areaAreas}
-              height={220}
+              height={180}
             />
           ) : (
             <p className="text-sm text-text-muted text-center py-12">Sem dados</p>
