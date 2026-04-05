@@ -37,65 +37,29 @@ function fixEncoding(text: string): string {
   return result;
 }
 
-// ─── Remoção de cabeçalhos/rodapés repetidos ─────────────────────────────
-function removeRepeatedHeadersFooters(pages: string[]): string[] {
-  if (pages.length < 3) return pages;
+// ─── Remoção de linhas muito repetidas (cabeçalhos/rodapés) ─────────────
+// pdf-parse não separa por página, então trabalhamos sobre o texto completo.
+// Linhas que aparecem 3+ vezes no documento são provavelmente cabeçalho/rodapé.
+function removeRepeatedLines(text: string, minRepeat = 3): string {
+  const lines = text.split("\n");
+  if (lines.length < minRepeat * 2) return text; // documento curto demais
 
-  // Pega as 3 primeiras linhas de cada página para detectar cabeçalho
-  const firstLines = pages.map((p) =>
-    p
-      .split("\n")
-      .slice(0, 3)
-      .join(" ")
-      .trim()
-      .slice(0, 80)
-  );
-  const lastLines = pages.map((p) =>
-    p
-      .split("\n")
-      .slice(-3)
-      .join(" ")
-      .trim()
-      .slice(0, 80)
-  );
-
-  // Se uma linha aparece em mais de 60% das páginas, é cabeçalho/rodapé
-  const threshold = Math.ceil(pages.length * 0.6);
-
-  const headerCandidates = new Map<string, number>();
-  const footerCandidates = new Map<string, number>();
-
-  for (const line of firstLines) {
-    if (line.length > 5) {
-      headerCandidates.set(line, (headerCandidates.get(line) ?? 0) + 1);
-    }
-  }
-  for (const line of lastLines) {
-    if (line.length > 5) {
-      footerCandidates.set(line, (footerCandidates.get(line) ?? 0) + 1);
+  const freq = new Map<string, number>();
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.length > 8) {
+      freq.set(trimmed, (freq.get(trimmed) ?? 0) + 1);
     }
   }
 
-  const repeatedHeaders = new Set(
-    [...headerCandidates.entries()]
-      .filter(([, count]) => count >= threshold)
-      .map(([line]) => line)
-  );
-  const repeatedFooters = new Set(
-    [...footerCandidates.entries()]
-      .filter(([, count]) => count >= threshold)
+  const repeated = new Set(
+    [...freq.entries()]
+      .filter(([, count]) => count >= minRepeat)
       .map(([line]) => line)
   );
 
-  return pages.map((page) => {
-    const lines = page.split("\n");
-    const filtered = lines.filter((line) => {
-      const trimmed = line.trim();
-      return !repeatedHeaders.has(trimmed.slice(0, 80)) &&
-        !repeatedFooters.has(trimmed.slice(0, 80));
-    });
-    return filtered.join("\n");
-  });
+  if (repeated.size === 0) return text;
+  return lines.filter((line) => !repeated.has(line.trim())).join("\n");
 }
 
 // ─── Normalização de espaços ──────────────────────────────────────────────
@@ -145,6 +109,7 @@ export async function extractPdfText(
   // Aplicar pipeline de limpeza
   let text = fixEncoding(rawText);
   text = normalizeWhitespace(text);
+  text = removeRepeatedLines(text); // remove cabeçalhos/rodapés repetidos por página
 
   const charsPerPage = pageCount > 0 ? Math.floor(text.length / pageCount) : 0;
 

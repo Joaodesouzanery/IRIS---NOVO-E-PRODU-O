@@ -214,11 +214,12 @@ export function extractFields(text: string): ExtractedFields {
   // Estágio 1: regex globais
   let interessado = firstMatch(text, RE_INTERESSADO);
   let processo    = firstMatch(text, RE_PROCESSO);
-  // Assunto: tenta "Assunto:" → "Ementa:" → "Tema:"
+  // Assunto: tenta "Assunto:" → "Ementa:" → "Tema:" → "Objeto:" (ANEEL e outras)
   let assunto =
     firstMatch(text, RE_ASSUNTO) ??
     firstMatch(text, /Ementa[:\s]+([^\n]{3,300})/gi) ??
-    firstMatch(text, /Tema[:\s]+([^\n]{3,300})/gi);
+    firstMatch(text, /Tema[:\s]+([^\n]{3,300})/gi) ??
+    firstMatch(text, /Objeto[:\s]+([^\n]{3,300})/gi);
 
   // Estágio 2: varredura linha a linha para campos ainda null
   if (!interessado || !processo || !assunto) {
@@ -226,6 +227,15 @@ export function extractFields(text: string): ExtractedFields {
     if (!interessado && labeled.has("interessado")) interessado = labeled.get("interessado")!;
     if (!processo    && labeled.has("processo"))    processo    = labeled.get("processo")!;
     if (!assunto     && labeled.has("assunto"))     assunto     = labeled.get("assunto")!;
+  }
+
+  // Trunca interessado no primeiro separador de cláusula após mínimo 5 chars
+  // Ex: "Empresa XYZ Ltda., que solicita autorização..." → "Empresa XYZ Ltda."
+  if (interessado && interessado.length > 5) {
+    const sepMatch = interessado.match(/^(.{5,}?)(?:,\s*(?:que|a qual|cujo|cujos|cujas|por meio|através|representad)|;\s*|\s{2,}|$)/);
+    if (sepMatch && sepMatch[1].length < interessado.length) {
+      interessado = sepMatch[1].trim().replace(/[,;.]\s*$/, "");
+    }
   }
 
   // Data: tenta extenso primeiro ("12 de janeiro de 2026"), depois numérico

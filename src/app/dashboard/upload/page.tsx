@@ -383,6 +383,7 @@ export default function UploadPage() {
   const [agenciaId, setAgenciaId] = useState<string>("");
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [analyzeProgress, setAnalyzeProgress] = useState<AnalyzeProgress>({ done: 0, total: 0 });
+  const [currentBatchFile, setCurrentBatchFile] = useState<string | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [confirmResults, setConfirmResults] = useState<BatchConfirmResponse | null>(null);
 
@@ -424,6 +425,7 @@ export default function UploadPage() {
     setAnalyzeError(null);
     setConfirmResults(null);
     setAnalyzeProgress({ done: 0, total: 0 });
+    setCurrentBatchFile(null);
   }
 
   // ── Etapa 2: Análise em lotes de BATCH_SIZE ──────────────────────────
@@ -440,13 +442,17 @@ export default function UploadPage() {
     try {
       for (let i = 0; i < allFiles.length; i += BATCH_SIZE) {
         const batch = allFiles.slice(i, i + BATCH_SIZE);
-        setAnalyzeProgress({ done: i, total: allFiles.length });
+        // Mostra o nome do primeiro arquivo do lote como indicador de progresso
+        setCurrentBatchFile(batch[0]?.file.name ?? null);
 
         const formData = new FormData();
         batch.forEach((qf) => formData.append("files", qf.file));
 
         const res = await api.upload<BatchPreviewResponse>("/upload/preview", formData);
         allResults.push(...res.results);
+
+        // Atualiza progresso DEPOIS do lote concluído
+        setAnalyzeProgress({ done: i + batch.length, total: allFiles.length });
 
         // Atualiza status dos arquivos deste lote na fila
         setQueue((prev) =>
@@ -458,6 +464,7 @@ export default function UploadPage() {
           })
         );
       }
+      setCurrentBatchFile(null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro ao analisar PDFs";
       setAnalyzeError(msg);
@@ -700,9 +707,10 @@ export default function UploadPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-center gap-2 text-text-secondary">
                   <Loader2 className="w-4 h-4 animate-spin text-brand" />
-                  <span>
-                    Analisando lote {Math.floor(analyzeProgress.done / BATCH_SIZE) + 1} de{" "}
-                    {Math.ceil(analyzeProgress.total / BATCH_SIZE)}...
+                  <span className="truncate max-w-xs">
+                    {currentBatchFile
+                      ? `Analisando: ${currentBatchFile}`
+                      : "Analisando PDFs..."}
                   </span>
                 </div>
                 <div className="w-full max-w-xs mx-auto bg-bg-hover rounded-full h-1.5">
@@ -712,8 +720,7 @@ export default function UploadPage() {
                   />
                 </div>
                 <p className="text-xs text-text-label font-mono">
-                  {Math.min(analyzeProgress.done + BATCH_SIZE, analyzeProgress.total)}{" "}
-                  de {analyzeProgress.total} arquivos
+                  {analyzeProgress.done} de {analyzeProgress.total} arquivo{analyzeProgress.total !== 1 ? "s" : ""}
                 </p>
               </div>
             ) : (
@@ -745,7 +752,7 @@ export default function UploadPage() {
                   Na fila — {queue.length} arquivo{queue.length !== 1 ? "s" : ""}
                   {stage === "analyzing" && (
                     <span className="ml-2 text-brand normal-case tracking-normal font-sans">
-                      processando em lotes de {BATCH_SIZE}...
+                      {analyzeProgress.done} de {analyzeProgress.total} concluídos...
                     </span>
                   )}
                 </p>
