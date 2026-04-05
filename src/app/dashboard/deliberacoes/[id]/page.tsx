@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { getLocalDelibs, updateLocalDelib } from "@/lib/local-store";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 const RESULTADOS = [
   "Deferido", "Indeferido", "Parcialmente Deferido", "Retirado de Pauta",
@@ -391,6 +392,7 @@ export default function DeliberacaoDetailPage({ params }: { params: { id: string
         <div className="flex items-center gap-2 mb-4">
           <Users className="w-4 h-4 text-brand" />
           <p className="section-label">Votação Individual</p>
+          <HelpTooltip text="Votos registrados de cada diretor. Quando aprovado por unanimidade, todos os diretores da agência são contados individualmente." />
           {deliberacao.votos && deliberacao.votos.length > 0 && (
             <span className="ml-auto text-xs text-text-muted font-mono">
               {deliberacao.votos.length} {deliberacao.votos.length === 1 ? "voto" : "votos"}

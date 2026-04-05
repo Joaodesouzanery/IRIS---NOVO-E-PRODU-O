@@ -47,13 +47,18 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Análise",
     items: [
       { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
-      { label: "→ Temas", href: "/dashboard/analytics/temas", icon: Tag },
-      { label: "→ Diretores", href: "/dashboard/analytics/diretores", icon: Users },
-      { label: "Mandatos", href: "/dashboard/mandatos", icon: Users },
-      { label: "Votação", href: "/dashboard/votacao", icon: Vote },
+      { label: "Temas", href: "/dashboard/analytics/temas", icon: Tag },
       { label: "Dashboard 360°", href: "/dashboard/360", icon: Layers },
       { label: "Insights", href: "/dashboard/insights", icon: Lightbulb },
       { label: "Governança", href: "/dashboard/governanca", icon: ShieldCheck },
+    ],
+  },
+  {
+    title: "Diretores",
+    items: [
+      { label: "Diretores", href: "/dashboard/analytics/diretores", icon: Users },
+      { label: "Mandatos", href: "/dashboard/mandatos", icon: Users },
+      { label: "Votação", href: "/dashboard/votacao", icon: Vote },
     ],
   },
   {

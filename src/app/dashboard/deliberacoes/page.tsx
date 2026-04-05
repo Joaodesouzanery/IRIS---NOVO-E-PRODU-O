@@ -7,6 +7,7 @@ import { cn, formatDate, getMicrotemaLabel } from "@/lib/utils";
 import type { DeliberacaoPaginada, Agencia, Deliberacao } from "@/types";
 import { Search, Download, ChevronLeft, ChevronRight, ExternalLink, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 import { getLocalDelibs, clearLocalDelibs } from "@/lib/local-store";
 
 const MICROTEMAS = [
@@ -85,7 +86,10 @@ export default function DeliberacoesPage() {
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-text-primary">Deliberações</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold text-text-primary">Deliberações</h1>
+            <HelpTooltip text="Lista de todas as deliberações extraídas. Use filtros para encontrar por agência, ano, microtema ou resultado." />
+          </div>
           <p className="text-sm text-text-muted mt-0.5">
             {totalCount > 0
               ? `${totalCount.toLocaleString("pt-BR")} deliberações encontradas`

@@ -7,6 +7,7 @@ import type { EmpresaStats, Agencia, Deliberacao } from "@/types";
 import { getMicrotemaLabel, getMicrotemaColor, formatDate, formatNumber, cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp, Search, Building2, TrendingUp, TrendingDown, Minus, AlertTriangle, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 const MICROTEMAS = [
   "tarifa", "obras", "multa", "contrato", "reequilibrio",
@@ -65,7 +66,10 @@ export default function EmpresasPage() {
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-text-primary">Empresas Reguladas</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold text-text-primary">Empresas Reguladas</h1>
+            <HelpTooltip text="Empresas e concessionárias identificadas nas deliberações. Risco calculado pela taxa de aprovação histórica." />
+          </div>
           <p className="text-sm text-text-muted mt-0.5">
             Empresas e concessionárias sob supervisão regulatória — extraídas das deliberações
           </p>

@@ -9,6 +9,7 @@ import {
   Minus, CheckCircle, XCircle, Users, ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 import { IrisBarChart } from "@/components/charts/IrisBarChart";
 import { ChartWrapper } from "@/components/charts/ChartWrapper";
 
@@ -108,6 +109,7 @@ export default function EmpresaDetailPage({ params }: { params: { id: string } }
             <Building className="w-5 h-5 text-brand shrink-0" />
             <h1 className="text-xl font-semibold text-text-primary">{empresa.nome}</h1>
             <RiscoBadge risco={empresa.risco_regulatorio} />
+            <HelpTooltip text="Risco Alto: < 40% aprovação. Risco Médio: 40-70%. Risco Baixo: > 70%. Tendência compara a primeira metade vs. segunda metade do histórico." />
           </div>
           <div className="flex items-center gap-3 mt-1.5 text-xs text-text-muted flex-wrap">
             <span>{empresa.total_deliberacoes} deliberações</span>

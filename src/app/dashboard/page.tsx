@@ -12,6 +12,7 @@ import { ChartWrapper } from "@/components/charts/ChartWrapper";
 import { getMicrotemaLabel, getMicrotemaColor, formatNumber, cn } from "@/lib/utils";
 import { FileText, CheckCircle, Tag, Cpu, TrendingUp, Users, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 interface ReunioesStats {
   period: string;
@@ -101,7 +102,10 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-text-primary">Inteligência Regulatória</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-text-primary">Inteligência Regulatória</h1>
+            <HelpTooltip text="Visão geral consolidada de todas as deliberações, taxas de deferimento, votações de diretores e evolução temporal." />
+          </div>
           <p className="text-sm text-text-muted mt-1">
             Análise de deliberações de agências reguladoras brasileiras
           </p>
@@ -120,7 +124,10 @@ export default function DashboardPage() {
 
       {/* KPIs */}
       <section>
-        <p className="section-label mb-3">Visão Geral</p>
+        <div className="flex items-center gap-2 mb-3">
+          <p className="section-label">Visão Geral</p>
+          <HelpTooltip text="KPIs principais: total de deliberações, taxa de deferimento, reuniões únicas e % classificadas automaticamente." />
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <MetricCard
             label="Total de Deliberações"
@@ -386,6 +393,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <p className="section-label">Alertas Regulatórios</p>
+              <HelpTooltip text="Alertas automáticos: empresas com múltiplos indeferimentos, temas em crescimento e diretores com alta divergência." />
               <span className={cn(
                 "text-xs px-2 py-0.5 rounded-full font-mono border",
                 alertas.some((a) => a.severity === "high")

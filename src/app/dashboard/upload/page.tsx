@@ -18,6 +18,7 @@ import {
   ChevronDown, ChevronRight, Trash2, RefreshCw, Copy, AlertTriangle,
 } from "lucide-react";
 import { appendLocalDelibs, getLocalDelibs } from "@/lib/local-store";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
 
@@ -616,7 +617,10 @@ export default function UploadPage() {
       {/* Cabeçalho */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-text-primary">Upload de PDFs</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold text-text-primary">Upload de PDFs</h1>
+            <HelpTooltip text="Envie PDFs de deliberações para extração automática de dados. O sistema identifica número, data, interessado, resultado e votos." />
+          </div>
           <p className="text-sm text-text-muted mt-1">
             Arraste os PDFs → analise com IA → revise os campos → confirme no sistema.
           </p>
