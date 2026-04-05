@@ -27,14 +27,14 @@ interface IrisBarChartProps {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-bg-card border border-border rounded-md px-3 py-2 text-sm shadow-xl">
-      <p className="text-text-secondary mb-1 font-mono text-xs">{label}</p>
+    <div className="bg-bg-card border border-border rounded-lg px-3 py-2 text-sm shadow-2xl">
+      <p className="text-text-muted mb-1.5 font-mono text-[10px] uppercase tracking-wider">{label}</p>
       {payload.map((entry: any, i: number) => (
         <div key={i} className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full" style={{ background: entry.color }} />
-          <span className="text-text-primary font-mono font-medium">{entry.value}</span>
+          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: entry.color }} />
+          <span className="text-text-primary font-mono font-medium text-sm">{entry.value}</span>
           {entry.name && entry.name !== "value" && (
-            <span className="text-text-muted text-xs">{entry.name}</span>
+            <span className="text-text-muted text-[10px]">{entry.name}</span>
           )}
         </div>
       ))}
@@ -58,22 +58,30 @@ export function IrisBarChart({
   if (horizontal) {
     return (
       <ResponsiveContainer width="100%" height={height}>
-        <BarChart data={data} layout="vertical" margin={{ left: 10, right: 20, top: 4, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" horizontal={false} />
-          <XAxis type="number" tick={{ fill: "#71717a", fontSize: 11, fontFamily: "JetBrains Mono" }} />
+        <BarChart data={data} layout="vertical" margin={{ left: 10, right: 24, top: 4, bottom: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#222222" horizontal={false} />
+          <XAxis
+            type="number"
+            tick={{ fill: "#52525b", fontSize: 10, fontFamily: "JetBrains Mono" }}
+            axisLine={false}
+            tickLine={false}
+          />
           <YAxis
             type="category"
             dataKey={xKey}
             width={110}
             tick={{ fill: "#a1a1aa", fontSize: 11, fontFamily: "JetBrains Mono" }}
             tickFormatter={fmt}
+            axisLine={false}
+            tickLine={false}
           />
-          <Tooltip content={<CustomTooltip />} />
-          <Bar dataKey={dataKey} radius={[0, 4, 4, 0]} maxBarSize={24}>
+          <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+          <Bar dataKey={dataKey} radius={[0, 4, 4, 0]} maxBarSize={18}>
             {data.map((entry, i) => (
               <Cell
                 key={i}
                 fill={useMicrotemaColors ? getMicrotemaColor(entry[xKey] as string) : color}
+                fillOpacity={useMicrotemaColors ? 0.9 : 1}
               />
             ))}
           </Bar>
@@ -84,30 +92,37 @@ export function IrisBarChart({
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data} margin={{ left: 0, right: 0, top: 4, bottom: 4 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
+      <BarChart data={data} margin={{ left: 0, right: 4, top: 4, bottom: 4 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#222222" vertical={false} />
         <XAxis
           dataKey={xKey}
-          tick={{ fill: "#71717a", fontSize: 11, fontFamily: "JetBrains Mono" }}
+          tick={{ fill: "#52525b", fontSize: 10, fontFamily: "JetBrains Mono" }}
           tickFormatter={fmt}
+          axisLine={false}
+          tickLine={false}
         />
-        <YAxis tick={{ fill: "#71717a", fontSize: 11, fontFamily: "JetBrains Mono" }} />
-        <Tooltip content={<CustomTooltip />} />
+        <YAxis
+          tick={{ fill: "#52525b", fontSize: 10, fontFamily: "JetBrains Mono" }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
         {multibar ? (
           <>
             <Legend
-              wrapperStyle={{ paddingTop: "8px", fontSize: "11px", fontFamily: "JetBrains Mono" }}
+              wrapperStyle={{ paddingTop: "8px", fontSize: "11px", fontFamily: "JetBrains Mono", color: "#71717a" }}
             />
             {multibar.map((b) => (
-              <Bar key={b.key} dataKey={b.key} fill={b.color} name={b.label} radius={[3, 3, 0, 0]} maxBarSize={32} />
+              <Bar key={b.key} dataKey={b.key} fill={b.color} name={b.label} radius={[3, 3, 0, 0]} maxBarSize={28} fillOpacity={0.9} />
             ))}
           </>
         ) : (
-          <Bar dataKey={dataKey} fill={color} radius={[3, 3, 0, 0]} maxBarSize={40}>
+          <Bar dataKey={dataKey} fill={color} radius={[3, 3, 0, 0]} maxBarSize={36}>
             {data.map((entry, i) => (
               <Cell
                 key={i}
                 fill={useMicrotemaColors ? getMicrotemaColor(entry[xKey] as string) : color}
+                fillOpacity={useMicrotemaColors ? 0.9 : 1}
               />
             ))}
           </Bar>

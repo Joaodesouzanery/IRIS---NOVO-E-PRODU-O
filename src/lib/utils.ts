@@ -54,19 +54,19 @@ export function getMicrotemaLabel(microtema: string): string {
 
 export function getMicrotemaColor(microtema: string): string {
   const colors: Record<string, string> = {
-    tarifa: "#f97316",
-    obras: "#3b82f6",
-    multa: "#ef4444",
-    contrato: "#8b5cf6",
-    reequilibrio: "#06b6d4",
-    fiscalizacao: "#10b981",
-    seguranca: "#f59e0b",
-    ambiental: "#22c55e",
-    desapropriacao: "#ec4899",
-    adimplencia: "#0ea5e9",
-    pessoal: "#a855f7",
-    usuario: "#6366f1",
-    outros: "#71717a",
+    tarifa:         "#f97316", // brand orange — mantido
+    obras:          "#60a5fa", // blue-400
+    multa:          "#f87171", // red-400
+    contrato:       "#a78bfa", // violet-400
+    reequilibrio:   "#22d3ee", // cyan-400
+    fiscalizacao:   "#34d399", // emerald-400
+    seguranca:      "#fbbf24", // amber-400
+    ambiental:      "#4ade80", // green-400
+    desapropriacao: "#f472b6", // pink-400
+    adimplencia:    "#38bdf8", // sky-400
+    pessoal:        "#c084fc", // purple-400
+    usuario:        "#818cf8", // indigo-400
+    outros:         "#71717a", // zinc-500
   };
   return colors[microtema] ?? "#71717a";
 }

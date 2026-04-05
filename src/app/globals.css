@@ -74,11 +74,11 @@
 
 @layer components {
   .section-label {
-    @apply text-label font-mono font-medium uppercase tracking-widest text-text-muted;
+    @apply text-label font-mono font-medium uppercase tracking-widest text-text-muted border-l-2 border-brand/30 pl-2;
   }
 
   .card {
-    @apply bg-bg-card border border-border rounded-card p-4;
+    @apply bg-bg-card border border-border rounded-card p-4 overflow-hidden;
   }
 
   .card-hover {

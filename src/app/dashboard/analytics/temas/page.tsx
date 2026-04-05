@@ -9,16 +9,17 @@ import { IrisPieChart } from "@/components/charts/IrisPieChart";
 import { IrisAreaChart } from "@/components/charts/IrisAreaChart";
 import { IrisLineChart } from "@/components/charts/IrisLineChart";
 import { ChartWrapper } from "@/components/charts/ChartWrapper";
-import { getMicrotemaLabel, formatNumber, cn } from "@/lib/utils";
+import { getMicrotemaLabel, getMicrotemaColor, formatNumber, cn } from "@/lib/utils";
 import { TrendingUp, Building2, Tag, ArrowUpRight, ArrowDownRight, GitMerge } from "lucide-react";
 import { ModuleTabs } from "@/components/ui/ModuleTabs";
 import { ANALISE_TABS } from "@/lib/module-tabs";
 
 const ANOS = Array.from({ length: 8 }, (_, i) => new Date().getFullYear() - i);
-const MICROTEMA_COLORS = [
-  "#f97316","#3b82f6","#22c55e","#8b5cf6","#ef4444",
-  "#06b6d4","#f59e0b","#10b981","#ec4899","#84cc16",
-  "#0ea5e9","#a78bfa","#fb7185",
+// Used only for empresas (no semantic color per company)
+const EMPRESA_COLORS = [
+  "#f97316","#60a5fa","#34d399","#a78bfa","#f87171",
+  "#22d3ee","#fbbf24","#f472b6","#818cf8","#4ade80",
+  "#38bdf8","#c084fc","#fb923c",
 ];
 
 function pctBar(pct: number, color: string) {
@@ -78,10 +79,10 @@ export default function AnalyticsTemasPage() {
     value: m.total,
   }));
 
-  const microPieData = microSorted.slice(0, 10).map((m, i) => ({
+  const microPieData = microSorted.slice(0, 10).map((m) => ({
     name: getMicrotemaLabel(m.microtema),
     value: m.total,
-    color: MICROTEMA_COLORS[i % MICROTEMA_COLORS.length],
+    color: getMicrotemaColor(m.microtema),
   }));
 
   // Tendência mensal: evolucao_mensal from analytics
@@ -108,7 +109,7 @@ export default function AnalyticsTemasPage() {
   const empresaPieData = topEmpresas.slice(0, 8).map((e, i) => ({
     name: e.nome.length > 25 ? e.nome.slice(0, 23) + "…" : e.nome,
     value: e.total_deliberacoes,
-    color: MICROTEMA_COLORS[i % MICROTEMA_COLORS.length],
+    color: EMPRESA_COLORS[i % EMPRESA_COLORS.length],
   }));
 
   // KPIs
@@ -240,7 +241,7 @@ export default function AnalyticsTemasPage() {
               </thead>
               <tbody>
                 {microSorted.map((m, i) => {
-                  const color = MICROTEMA_COLORS[i % MICROTEMA_COLORS.length];
+                  const color = getMicrotemaColor(m.microtema);
                   const prevTotal = microSorted[i + 1]?.total;
                   const trend = prevTotal !== undefined
                     ? m.total > prevTotal ? "up" : m.total < prevTotal ? "down" : "same"

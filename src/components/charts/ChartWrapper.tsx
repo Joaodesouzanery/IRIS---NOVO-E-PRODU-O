@@ -42,28 +42,29 @@ export function ChartWrapper({
   const [type, setType] = useState<ChartType>(defaultType ?? availableTypes[0]);
 
   return (
-    <div className={cn("card", className)}>
+    <div className={cn("card overflow-hidden", className)}>
       <div className="flex items-start justify-between mb-3 gap-2">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-text-secondary leading-tight">{title}</p>
+          <p className="text-sm font-medium text-text-primary leading-tight">{title}</p>
           {subtitle && <p className="text-xs text-text-muted mt-0.5">{subtitle}</p>}
           {titleExtra}
         </div>
 
         {availableTypes.length > 1 && (
-          <div className="flex items-center gap-0.5 bg-bg-hover rounded-lg p-0.5 shrink-0">
+          <div className="flex items-center gap-0.5 shrink-0">
             {availableTypes.map((t) => {
               const Icon = TYPE_ICONS[t];
+              const isActive = type === t;
               return (
                 <button
                   key={t}
                   title={TYPE_LABELS[t]}
                   onClick={() => setType(t)}
                   className={cn(
-                    "p-1.5 rounded transition-colors",
-                    type === t
-                      ? "bg-brand text-white shadow-sm"
-                      : "text-text-muted hover:text-text-secondary hover:bg-bg-card"
+                    "p-1.5 rounded-md transition-all duration-150",
+                    isActive
+                      ? "bg-bg-hover border border-brand/40 text-brand"
+                      : "text-text-label hover:text-text-muted hover:bg-bg-hover border border-transparent"
                   )}
                 >
                   <Icon className="w-3.5 h-3.5" />

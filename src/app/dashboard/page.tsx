@@ -173,7 +173,7 @@ export default function DashboardPage() {
             defaultType="pie"
           >
             {(type) => type === "pie"
-              ? <IrisPieChart data={resultadosPieData} height={160} innerRadius={45} />
+              ? <IrisPieChart data={resultadosPieData} height={160} innerRadius={45} showTotal />
               : <IrisBarChart data={resultadosPieData.map((d) => ({ name: d.name, value: d.value }))} height={160} />
             }
           </ChartWrapper>
@@ -186,7 +186,7 @@ export default function DashboardPage() {
           >
             {(type) => pautaPieData.length > 0
               ? type === "pie"
-                ? <IrisPieChart data={pautaPieData} height={160} innerRadius={45} />
+                ? <IrisPieChart data={pautaPieData} height={160} innerRadius={45} showTotal />
                 : <IrisBarChart data={pautaPieData.map((d) => ({ name: d.name, value: d.value }))} height={160} />
               : <div className="h-[160px] flex items-center justify-center text-text-muted text-sm">Sem dados</div>
             }
@@ -194,21 +194,32 @@ export default function DashboardPage() {
 
           {/* Votos por diretor */}
           <div className="card">
-            <p className="section-label mb-2">Votos por Diretor</p>
-            {diretores && diretores.length > 0 ? (
-              <div className="space-y-2 mt-2">
-                {diretores.slice(0, 5).map((d) => (
-                  <div key={d.diretor_id} className="flex items-center justify-between">
-                    <span className="text-xs text-text-secondary truncate max-w-[140px]">
-                      {d.diretor_nome.split(" ").slice(0, 2).join(" ")}
-                    </span>
-                    <span className="font-mono text-sm text-brand font-medium">
-                      {formatNumber(d.total)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
+            <p className="section-label mb-3">Votos por Diretor</p>
+            {diretores && diretores.length > 0 ? (() => {
+              const maxVotos = Math.max(...diretores.slice(0, 5).map((d) => d.total), 1);
+              return (
+                <div className="space-y-3 mt-1">
+                  {diretores.slice(0, 5).map((d) => (
+                    <div key={d.diretor_id}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-text-secondary truncate max-w-[140px]">
+                          {d.diretor_nome.split(" ").slice(0, 2).join(" ")}
+                        </span>
+                        <span className="font-mono text-xs text-text-muted font-medium">
+                          {formatNumber(d.total)}
+                        </span>
+                      </div>
+                      <div className="w-full bg-bg-hover rounded-full h-1.5">
+                        <div
+                          className="h-1.5 rounded-full bg-brand/70 transition-all duration-500"
+                          style={{ width: `${(d.total / maxVotos) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })() : (
               <p className="text-xs text-text-muted mt-2">Nenhum dado disponível</p>
             )}
           </div>
@@ -235,7 +246,6 @@ export default function DashboardPage() {
               return (
                 <IrisBarChart
                   data={microtemasBarData}
-                  useMicrotemaColors
                   horizontal
                   height={200}
                   formatLabel={getMicrotemaLabel}
@@ -248,27 +258,29 @@ export default function DashboardPage() {
           <div className="card">
             <p className="section-label mb-3">Confiança da IA</p>
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-end justify-between">
                 <span className="text-xs text-text-muted">Média de confiança</span>
-                <span className="font-mono text-brand font-medium">
+                <span className="font-mono text-xl font-semibold text-text-primary">
                   {overview?.avg_confidence ? `${(overview.avg_confidence * 100).toFixed(0)}%` : "—"}
                 </span>
               </div>
-              <div className="w-full bg-bg-hover rounded-full h-1.5">
+              <div className="w-full bg-bg-hover rounded-full h-2">
                 <div
-                  className="h-1.5 rounded-full bg-brand transition-all duration-700"
+                  className="h-2 rounded-full bg-brand transition-all duration-700"
                   style={{ width: `${(overview?.avg_confidence ?? 0) * 100}%` }}
                 />
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-text-muted">Microtemas identificados</span>
-                <span className="font-mono text-sm text-brand font-medium">{microtemas?.length ?? "—"}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-text-muted">Top microtema</span>
-                {overview?.top_microtema && (
-                  <span className="badge-orange text-xs">{getMicrotemaLabel(overview.top_microtema)}</span>
-                )}
+              <div className="pt-1 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-text-muted">Microtemas identificados</span>
+                  <span className="font-mono text-sm text-text-secondary font-medium">{microtemas?.length ?? "—"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-text-muted">Top microtema</span>
+                  {overview?.top_microtema && (
+                    <span className="badge-orange text-xs">{getMicrotemaLabel(overview.top_microtema)}</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
