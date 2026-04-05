@@ -85,6 +85,9 @@ export function isPdfBuffer(buffer: Buffer): boolean {
   );
 }
 
+const PDF_PARSE_TIMEOUT_MS = 25_000; // 25s — deixa margem para o timeout de 60s do Vercel
+const MAX_PDF_STREAMS = 500;         // PDFs legítimos raramente têm mais de 500 streams
+
 // ─── Extração principal ───────────────────────────────────────────────────
 export interface PdfExtractionResult {
   text: string;
@@ -99,7 +102,27 @@ export async function extractPdfText(
     throw new Error("Arquivo inválido: não é um PDF (magic bytes incorretos)");
   }
 
-  const data = await pdfParse(buffer);
+  // Proteção básica contra PDF bomb: conta streams no início do arquivo
+  // PDFs maliciosos com compressão excessiva têm centenas de streams aninhados
+  const sample = buffer.toString("binary", 0, Math.min(buffer.length, 200_000));
+  const streamCount = sample.match(/\bstream\b/g)?.length ?? 0;
+  if (streamCount > MAX_PDF_STREAMS) {
+    throw new Error(
+      `PDF rejeitado: ${streamCount} streams detectados (máx ${MAX_PDF_STREAMS}). ` +
+      "Possível PDF bomb ou documento corrompido."
+    );
+  }
+
+  // Timeout de 25s — evita DoS por PDFs malformados que travam o parser
+  const data = await Promise.race([
+    pdfParse(buffer),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error("Timeout ao processar PDF (>25s). O arquivo pode estar corrompido.")),
+        PDF_PARSE_TIMEOUT_MS
+      )
+    ),
+  ]);
   const pageCount = data.numpages;
 
   // Divide por página para limpeza de cabeçalhos/rodapés

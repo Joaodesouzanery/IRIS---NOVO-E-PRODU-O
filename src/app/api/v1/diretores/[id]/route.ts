@@ -9,12 +9,10 @@ import { demoData } from "@/lib/demo-data";
 import { isLocalMode, getSyncedDelibs } from "@/lib/server/local-data-store";
 import { computeDiretorProfile } from "@/lib/server/analytics-engine";
 import type { DiretorProfile } from "@/types";
+import { isDemo } from "@/lib/server/is-demo";
 
 const SAFE_ID_RE = /^[a-zA-Z0-9_-]+$/;
 
-function isDemo(req: NextRequest): boolean {
-  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
-}
 
 export async function GET(
   req: NextRequest,
@@ -27,7 +25,7 @@ export async function GET(
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
 
-  if (isDemo(req)) {
+  if (isDemo()) {
     if (isLocalMode()) {
       const profile = computeDiretorProfile(getSyncedDelibs(), id);
       if (!profile) return NextResponse.json({ error: "Diretor não encontrado" }, { status: 404 });

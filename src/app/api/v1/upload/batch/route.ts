@@ -7,16 +7,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { demoData } from "@/lib/demo-data";
+import { isDemo } from "@/lib/server/is-demo";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB por arquivo
 const MAX_FILES_PER_BATCH = 1000;
 
-function isDemo(req: NextRequest): boolean {
-  return (
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    req.nextUrl.searchParams.get("demo") === "1"
-  );
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,7 +19,7 @@ export async function POST(req: NextRequest) {
 
     // Modo demo: processa PDFs via NLP sem persistir no Supabase.
     // Extrai campos e retorna resultado imediato (status "done") para cada arquivo válido.
-    if (isDemo(req)) {
+    if (isDemo()) {
       const files = formData.getAll("files") as File[];
       if (files.length === 0) {
         return NextResponse.json({ error: "Nenhum arquivo enviado" }, { status: 400 });

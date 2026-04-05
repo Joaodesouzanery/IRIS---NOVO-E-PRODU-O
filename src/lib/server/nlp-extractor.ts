@@ -30,7 +30,8 @@ const RE_ASSUNTO     = /Assunto[:\s]+([^\n]{3,300})/gi;
 const RE_RESULTADO = /\b(DEFERIDO|INDEFERIDO|DEFERIMENTO|INDEFERIMENTO|PARCIALMENTE\s*DEFERIDO|RETIRADO\s*DE\s*PAUTA|RATIFICA(?:DO)?|APROVA(?:DO)?(?:\s*COM\s*RESSALVAS)?|RECOMENDA(?:DO)?|DETERMINA(?:DO)?|AUTORIZA(?:DO)?|HOMOLOGA(?:DO)?|ARQUIVA(?:DO)?|ANULA(?:DO)?|REVOGA(?:DO)?|CANCELA(?:DO)?|PREJUDICA(?:DO)?)\b/gi;
 
 // Unanimidade — qualquer das frases comuns em deliberações brasileiras
-const RE_UNANIMIDADE = /(?:por\s+unanimidade(?:\s+d[eo]s?\s+(?:votos?|presentes?))?|unanimidade\s+d[eo]s?\s+votos?|unanimidade\s+d[eo]s?\s+presentes?|aprovad[oa]\s+(?:pelos?\s+presentes?\s+)?por\s+unanimidade)/gi;
+// Alternativas simples sem quantificadores aninhados (evita ReDoS)
+const RE_UNANIMIDADE = /(?:por\s+unanimidade\s+dos?\s+votos?|por\s+unanimidade\s+dos?\s+presentes?|por\s+unanimidade|unanimidade\s+dos?\s+votos?|unanimidade\s+dos?\s+presentes?|aprovad[oa]\s+por\s+unanimidade)/gi;
 
 // Voto dissidente / divergente — extrai o nome do diretor que votou contra
 const RE_VOTO_DISSIDENTE =
@@ -290,7 +291,8 @@ export function extractFields(text: string): ExtractedFields {
   }
 
   // Fundamento da decisão: marcadores expandidos para cobrir ARTESP e outras agências
-  const RE_FUNDAMENTO = /(?:Fundamento[:\s]+|Em face do exposto|Considerando\s+o\s+exposto|Diante\s+do\s+exposto|Pelo\s+exposto|Tendo\s+em\s+vista[^,\n]{0,30},\s*decide[:\s]+|DECIDE\s+A\s+DIRETORIA[:\s]+|A\s+DIRETORIA(?:\s+DA\s+\w+)?\s+DECIDE[:\s]+|DECIDE[:\s]+|Decide-se[:\s]+|RESOLVE[:\s]+)([\s\S]{20,1000}?)(?=\n\n|\n[A-Z]{3}|$)/i;
+  // [\s\S] limitado a 800 chars (greedy) para evitar backtracking excessivo
+  const RE_FUNDAMENTO = /(?:Fundamento[:\s]+|Em face do exposto|Considerando\s+o\s+exposto|Diante\s+do\s+exposto|Pelo\s+exposto|Tendo\s+em\s+vista[^,\n]{0,30},\s*decide[:\s]+|DECIDE\s+A\s+DIRETORIA[:\s]+|A\s+DIRETORIA(?:\s+DA\s+\w+)?\s+DECIDE[:\s]+|DECIDE[:\s]+|Decide-se[:\s]+|RESOLVE[:\s]+)([\s\S]{20,800}?)(?:\n\n|\n[A-Z]{3}|$)/i;
   const fundamento_decisao = RE_FUNDAMENTO.exec(text)?.[1]?.trim() ?? null;
 
   // Número da reunião (apenas o ordinal)

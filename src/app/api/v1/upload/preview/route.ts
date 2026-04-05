@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type { PreviewResult, BatchPreviewResponse } from "@/types";
+import { isDemo } from "@/lib/server/is-demo";
 
 const MAX_FILE_SIZE   = 50 * 1024 * 1024; // 50 MB por arquivo
 const MAX_TOTAL_SIZE  = 25 * 1024 * 1024; // 25 MB por lote (segurança Vercel)
@@ -20,12 +21,6 @@ const DEMO_AGENCIES = [
   { id: "demo-agency-anvisa", sigla: "ANVISA" },
 ];
 
-function isDemo(req: NextRequest): boolean {
-  return (
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    req.nextUrl.searchParams.get("demo") === "1"
-  );
-}
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
@@ -64,7 +59,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let allAgencias: { id: string; sigla: string }[];
     let db: Awaited<ReturnType<typeof import("@/lib/supabase/server").createSupabaseServerClient>> | null = null;
 
-    if (isDemo(req)) {
+    if (isDemo()) {
       allAgencias = DEMO_AGENCIES;
     } else {
       const { createSupabaseServerClient } = await import("@/lib/supabase/server");
