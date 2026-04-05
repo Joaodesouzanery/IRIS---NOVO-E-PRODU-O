@@ -8,6 +8,8 @@ import type { DeliberacaoPaginada, Agencia, Deliberacao } from "@/types";
 import { Search, Download, ChevronLeft, ChevronRight, ExternalLink, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { DELIBERACOES_TABS } from "@/lib/module-tabs";
 import { getLocalDelibs, clearLocalDelibs } from "@/lib/local-store";
 
 const MICROTEMAS = [
@@ -84,6 +86,7 @@ export default function DeliberacoesPage() {
 
   return (
     <div className="space-y-4 animate-fade-in">
+      <ModuleTabs tabs={DELIBERACOES_TABS} />
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">

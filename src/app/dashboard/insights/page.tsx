@@ -5,6 +5,8 @@ import { api } from "@/lib/api";
 import type { VotoMatrixRow, MicrotemaStats } from "@/types";
 import { getMicrotemaLabel, cn } from "@/lib/utils";
 import { Lightbulb, TrendingUp, AlertTriangle } from "lucide-react";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { ANALISE_TABS } from "@/lib/module-tabs";
 
 export default function InsightsPage() {
   const { data: matrix } = useQuery({
@@ -22,6 +24,7 @@ export default function InsightsPage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      <ModuleTabs tabs={ANALISE_TABS} />
       <div>
         <h1 className="text-xl font-semibold text-text-primary">Insights Competitivos</h1>
         <p className="text-sm text-text-muted mt-1">

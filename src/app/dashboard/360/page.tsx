@@ -13,6 +13,8 @@ import { IrisAreaChart } from "@/components/charts/IrisAreaChart";
 import { getMicrotemaLabel, formatNumber, formatDate, cn } from "@/lib/utils";
 import { SlidersHorizontal, Settings, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { ANALISE_TABS } from "@/lib/module-tabs";
 
 const ANOS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
 const MICROTEMAS = [
@@ -253,6 +255,7 @@ export default function Dashboard360Page() {
       className="space-y-6 animate-fade-in"
       onClick={() => { if (openPref) setOpenPref(null); }}
     >
+      <ModuleTabs tabs={ANALISE_TABS} />
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>

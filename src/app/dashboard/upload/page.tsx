@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { appendLocalDelibs, getLocalDelibs } from "@/lib/local-store";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { DELIBERACOES_TABS } from "@/lib/module-tabs";
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
 
@@ -614,6 +616,7 @@ export default function UploadPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+      <ModuleTabs tabs={DELIBERACOES_TABS} />
       {/* Cabeçalho */}
       <div className="flex items-start justify-between">
         <div>

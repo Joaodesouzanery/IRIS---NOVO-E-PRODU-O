@@ -13,6 +13,8 @@ import { getMicrotemaLabel, getMicrotemaColor, formatNumber, cn } from "@/lib/ut
 import { FileText, CheckCircle, Tag, Cpu, TrendingUp, Users, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { DELIBERACOES_TABS } from "@/lib/module-tabs";
 
 interface ReunioesStats {
   period: string;
@@ -99,6 +101,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      <ModuleTabs tabs={DELIBERACOES_TABS} />
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>

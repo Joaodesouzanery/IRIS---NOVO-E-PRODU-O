@@ -7,6 +7,8 @@ import type { MicrotemaStats, Agencia } from "@/types";
 import { IrisBarChart } from "@/components/charts/IrisBarChart";
 import { getMicrotemaLabel, getMicrotemaColor, getMicrotemaCategoriaLabel, formatNumber } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { REGULATORIO_TABS } from "@/lib/module-tabs";
 
 interface VotacaoSector {
   microtema: string;
@@ -63,6 +65,7 @@ export default function SetoresPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <ModuleTabs tabs={REGULATORIO_TABS} />
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>

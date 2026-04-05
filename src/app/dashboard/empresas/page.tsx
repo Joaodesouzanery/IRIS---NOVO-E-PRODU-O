@@ -8,6 +8,8 @@ import { getMicrotemaLabel, getMicrotemaColor, formatDate, formatNumber, cn } fr
 import { ChevronDown, ChevronUp, Search, Building2, TrendingUp, TrendingDown, Minus, AlertTriangle, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { REGULATORIO_TABS } from "@/lib/module-tabs";
 
 const MICROTEMAS = [
   "tarifa", "obras", "multa", "contrato", "reequilibrio",
@@ -63,6 +65,7 @@ export default function EmpresasPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <ModuleTabs tabs={REGULATORIO_TABS} />
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>

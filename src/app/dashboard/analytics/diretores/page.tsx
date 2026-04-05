@@ -11,6 +11,8 @@ import { ChartWrapper } from "@/components/charts/ChartWrapper";
 import { getMicrotemaLabel, formatNumber, cn } from "@/lib/utils";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { Users, Grid3x3, Handshake, BarChart3 } from "lucide-react";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { DIRETORES_TABS } from "@/lib/module-tabs";
 
 const MICROTEMA_COLORS = [
   "#f97316","#3b82f6","#22c55e","#8b5cf6","#ef4444",
@@ -166,6 +168,7 @@ export default function AnalyticsDiretoresPage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      <ModuleTabs tabs={DIRETORES_TABS} />
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>

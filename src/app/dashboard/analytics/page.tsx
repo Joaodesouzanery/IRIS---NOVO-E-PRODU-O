@@ -9,6 +9,8 @@ import { GaugeChart } from "@/components/charts/GaugeChart";
 import { getMicrotemaLabel, formatNumber } from "@/lib/utils";
 import Link from "next/link";
 import { BarChart3, Users, Building2 } from "lucide-react";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { ANALISE_TABS } from "@/lib/module-tabs";
 
 const ANOS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
 
@@ -53,6 +55,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      <ModuleTabs tabs={ANALISE_TABS} />
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-text-primary">Analytics</h1>

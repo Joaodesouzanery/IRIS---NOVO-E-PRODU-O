@@ -12,6 +12,8 @@ import {
 import Link from "next/link";
 import { getLocalDelibs, updateLocalDelib } from "@/lib/local-store";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { DELIBERACOES_TABS } from "@/lib/module-tabs";
 
 const RESULTADOS = [
   "Deferido", "Indeferido", "Parcialmente Deferido", "Retirado de Pauta",
@@ -160,6 +162,7 @@ export default function DeliberacaoDetailPage({ params }: { params: { id: string
 
   return (
     <div className="max-w-3xl space-y-5 animate-fade-in">
+      <ModuleTabs tabs={DELIBERACOES_TABS} />
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-start gap-3 flex-wrap">

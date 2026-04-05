@@ -6,6 +6,8 @@ import { api } from "@/lib/api";
 import type { Agencia } from "@/types";
 import { formatDate, cn } from "@/lib/utils";
 import { Building2, Plus, Check } from "lucide-react";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { CONFIG_TABS } from "@/lib/module-tabs";
 
 export default function AgenciasPage() {
   const qc = useQueryClient();
@@ -31,6 +33,7 @@ export default function AgenciasPage() {
 
   return (
     <div className="max-w-2xl space-y-6 animate-fade-in">
+      <ModuleTabs tabs={CONFIG_TABS} />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-text-primary">Agências Reguladoras</h1>
