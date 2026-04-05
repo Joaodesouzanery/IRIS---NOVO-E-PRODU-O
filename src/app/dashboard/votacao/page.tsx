@@ -5,6 +5,8 @@ import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import type { VotoMatrixRow, VotoDistribution } from "@/types";
 import { IrisPieChart } from "@/components/charts/IrisPieChart";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { DIRETORES_TABS } from "@/lib/module-tabs";
 
 const TIPO_VOTO_COLORS: Record<string, string> = {
   Favoravel: "#22c55e",
@@ -39,6 +41,7 @@ export default function VotacaoPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <ModuleTabs tabs={DIRETORES_TABS} />
       <div>
         <h1 className="text-xl font-semibold text-text-primary">Votação</h1>
         <p className="text-sm text-text-muted mt-1">

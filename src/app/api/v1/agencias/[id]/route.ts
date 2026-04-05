@@ -5,16 +5,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { demoData } from "@/lib/demo-data";
+import { isDemo } from "@/lib/server/is-demo";
 
-function isDemo(req: NextRequest): boolean {
-  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
-}
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (isDemo(req)) {
+  if (isDemo()) {
     const found = demoData.agencias().find((a) => a.id === params.id);
     if (!found) return NextResponse.json({ error: "Agência não encontrada" }, { status: 404 });
     return NextResponse.json(found);
@@ -39,7 +37,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (isDemo(req)) {
+  if (isDemo()) {
     return NextResponse.json(
       { error: "Edição não disponível em modo demo" },
       { status: 403 }

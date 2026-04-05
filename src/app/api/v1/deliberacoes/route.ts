@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { demoData } from "@/lib/demo-data";
 import { isLocalMode, getSyncedDelibs } from "@/lib/server/local-data-store";
 import { computeDelibList } from "@/lib/server/analytics-engine";
+import { isDemo } from "@/lib/server/is-demo";
 
 const VALID_SORT_COLUMNS = new Set([
   "data_reuniao",
@@ -17,14 +18,11 @@ const VALID_SORT_COLUMNS = new Set([
   "created_at",
 ]);
 
-function isDemo(req: NextRequest): boolean {
-  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
-}
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
 
-  if (isDemo(req)) {
+  if (isDemo()) {
     const page = parseInt(searchParams.get("page") ?? "1", 10);
     const limit = parseInt(searchParams.get("limit") ?? "20", 10);
     const agencia_id = searchParams.get("agencia_id") ?? undefined;
@@ -69,25 +67,49 @@ export async function GET(req: NextRequest) {
       `id, numero_deliberacao, reuniao_ordinaria, data_reuniao,
        interessado, processo, microtema, resultado, pauta_interna,
        extraction_confidence, agencia_id, created_at,
+       agencias (sigla, nome),
        votos (id, tipo_voto, is_divergente, diretor_id,
          diretores (nome))`,
       { count: "exact" }
     );
 
+  // Validação de formatos para evitar injeção via query params
+  const UUID_RE     = /^[0-9a-f-]{32,36}$/i;
+  const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  const YEAR_RE     = /^(19|20)\d{2}$/;
+
   const agenciaId = searchParams.get("agencia_id");
-  if (agenciaId) query = query.eq("agencia_id", agenciaId);
+  if (agenciaId) {
+    if (!UUID_RE.test(agenciaId)) {
+      return NextResponse.json({ error: "agencia_id inválido" }, { status: 400 });
+    }
+    query = query.eq("agencia_id", agenciaId);
+  }
 
   const year = searchParams.get("year");
   if (year) {
+    if (!YEAR_RE.test(year)) {
+      return NextResponse.json({ error: "year deve ser um ano válido (ex: 2024)" }, { status: 400 });
+    }
     query = query
       .gte("data_reuniao", `${year}-01-01`)
       .lte("data_reuniao", `${year}-12-31`);
   }
 
   const dateFrom = searchParams.get("date_from");
-  const dateTo = searchParams.get("date_to");
-  if (dateFrom) query = query.gte("data_reuniao", dateFrom);
-  if (dateTo) query = query.lte("data_reuniao", dateTo);
+  const dateTo   = searchParams.get("date_to");
+  if (dateFrom) {
+    if (!ISO_DATE_RE.test(dateFrom)) {
+      return NextResponse.json({ error: "date_from deve ser YYYY-MM-DD" }, { status: 400 });
+    }
+    query = query.gte("data_reuniao", dateFrom);
+  }
+  if (dateTo) {
+    if (!ISO_DATE_RE.test(dateTo)) {
+      return NextResponse.json({ error: "date_to deve ser YYYY-MM-DD" }, { status: 400 });
+    }
+    query = query.lte("data_reuniao", dateTo);
+  }
 
   const microtema = searchParams.get("microtema");
   if (microtema) query = query.eq("microtema", microtema);
@@ -100,7 +122,9 @@ export async function GET(req: NextRequest) {
 
   const search = searchParams.get("search");
   if (search && search.trim().length >= 2) {
-    query = query.ilike("raw_text", `%${search.trim()}%`);
+    // Escapa wildcards do ILIKE para evitar wildcard injection
+    const escaped = search.trim().replace(/[\\%_]/g, "\\$&");
+    query = query.ilike("raw_text", `%${escaped}%`);
   }
 
   query = query
@@ -116,6 +140,8 @@ export async function GET(req: NextRequest) {
 
   const formatted = (data ?? []).map((d: any) => ({
     ...d,
+    agencia: d.agencias ?? null,
+    agencias: undefined,
     votos: (d.votos ?? []).map((v: any) => ({
       id: v.id,
       tipo_voto: v.tipo_voto,
@@ -135,7 +161,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (isDemo(req)) {
+  if (isDemo()) {
     // Demo mode: client handles localStorage deletion
     return NextResponse.json({ deleted: 0, demo: true });
   }
@@ -148,18 +174,26 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
+  // agencia_id obrigatório — nunca permitir delete sem escopo de agência
+  const agencia_id = req.nextUrl.searchParams.get("agencia_id");
+  if (!agencia_id) {
+    return NextResponse.json(
+      { error: "agencia_id é obrigatório no DELETE para evitar remoção global" },
+      { status: 400 }
+    );
+  }
+
   const { createSupabaseServerClient } = await import("@/lib/supabase/server");
   const db = createSupabaseServerClient();
-  const agencia_id = req.nextUrl.searchParams.get("agencia_id");
 
-  // Build delete query — neq("id","") selects all rows
-  let q = db.from("deliberacoes").delete().neq("id", "");
-  if (agencia_id) q = q.eq("agencia_id", agencia_id) as typeof q;
+  const { error, count } = await db
+    .from("deliberacoes")
+    .delete()
+    .eq("agencia_id", agencia_id);
 
-  const { error, count } = await q;
   if (error) {
     console.error("[deliberacoes DELETE] Erro:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Erro ao deletar deliberações" }, { status: 500 });
   }
 
   return NextResponse.json({ deleted: count ?? 0 });

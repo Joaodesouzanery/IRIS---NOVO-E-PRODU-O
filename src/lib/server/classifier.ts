@@ -82,19 +82,23 @@ export function classifyMicrotema(text: string): ClassificationResult {
   const scores = new Map<string, number>();
 
   for (const [tema, keywords] of Object.entries(MICROTEMA_KEYWORDS)) {
-    let matches = 0;
+    let score = 0;
     for (const kw of keywords) {
-      if (textLower.includes(kw.toLowerCase())) matches++;
+      if (textLower.includes(kw.toLowerCase())) {
+        // Frases mais específicas (mais palavras) valem mais — evita falso-positivo por palavras genéricas
+        const wordCount = kw.trim().split(/\s+/).length;
+        score += wordCount;
+      }
     }
-    if (matches > 0) scores.set(tema, matches);
+    if (score > 0) scores.set(tema, score);
   }
 
   if (scores.size === 0) return { microtema: "outros", confidence: 0 };
 
-  const totalMatches = [...scores.values()].reduce((a, b) => a + b, 0);
+  const totalScore = [...scores.values()].reduce((a, b) => a + b, 0);
   const [[bestTema, bestScore]] = [...scores.entries()].sort((a, b) => b[1] - a[1]);
 
-  return { microtema: bestTema, confidence: bestScore / totalMatches };
+  return { microtema: bestTema, confidence: bestScore / totalScore };
 }
 
 // ─── Classificação de pauta interna ──────────────────────────────────────

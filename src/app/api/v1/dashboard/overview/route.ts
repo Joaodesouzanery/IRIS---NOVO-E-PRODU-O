@@ -7,15 +7,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { demoData } from "@/lib/demo-data";
 import { isLocalMode, getSyncedDelibs } from "@/lib/server/local-data-store";
 import { computeOverview } from "@/lib/server/analytics-engine";
+import { isDemo } from "@/lib/server/is-demo";
 
-function isDemo(req: NextRequest): boolean {
-  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
-}
 
 export async function GET(req: NextRequest) {
   const agenciaId = req.nextUrl.searchParams.get("agencia_id") || null;
 
-  if (isDemo(req)) {
+  if (isDemo()) {
     if (isLocalMode()) {
       return NextResponse.json(computeOverview(getSyncedDelibs(), agenciaId));
     }

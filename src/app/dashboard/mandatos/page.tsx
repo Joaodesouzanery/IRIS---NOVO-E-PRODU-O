@@ -14,6 +14,8 @@ import { IrisAreaChart } from "@/components/charts/IrisAreaChart";
 import { MandatoGanttChart, type GanttRow } from "@/components/charts/MandatoGanttChart";
 import Link from "next/link";
 import { Users, AlertTriangle, CheckCircle, Shield, ChevronRight } from "lucide-react";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { DIRETORES_TABS } from "@/lib/module-tabs";
 
 // ─── Director Card ──────────────────────────────────────────────────────────
 
@@ -192,6 +194,7 @@ export default function MandatosPage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      <ModuleTabs tabs={DIRETORES_TABS} />
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>

@@ -76,7 +76,7 @@ export async function processPdf(jobId: string, agenciaId: string): Promise<void
         extraction_confidence: confidence,
         resumo_pleito: fields.resumo_pleito ?? null,
         fundamento_decisao: fields.fundamento_decisao ?? null,
-        raw_text: extraction.text.slice(0, 50000), // limite de storage
+        raw_text: extraction.text, // texto completo (Supabase text não tem limite)
         upload_job_id: jobId,
       })
       .select("id")

@@ -11,6 +11,8 @@ import { IrisLineChart } from "@/components/charts/IrisLineChart";
 import { ChartWrapper } from "@/components/charts/ChartWrapper";
 import { getMicrotemaLabel, formatNumber, cn } from "@/lib/utils";
 import { TrendingUp, Building2, Tag, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { ANALISE_TABS } from "@/lib/module-tabs";
 
 const ANOS = Array.from({ length: 8 }, (_, i) => new Date().getFullYear() - i);
 const MICROTEMA_COLORS = [
@@ -109,6 +111,7 @@ export default function AnalyticsTemasPage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      <ModuleTabs tabs={ANALISE_TABS} />
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>

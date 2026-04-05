@@ -5,8 +5,11 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { EmpresaStats, Agencia, Deliberacao } from "@/types";
 import { getMicrotemaLabel, getMicrotemaColor, formatDate, formatNumber, cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, Search, Building2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Search, Building2, TrendingUp, TrendingDown, Minus, AlertTriangle, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { REGULATORIO_TABS } from "@/lib/module-tabs";
 
 const MICROTEMAS = [
   "tarifa", "obras", "multa", "contrato", "reequilibrio",
@@ -62,10 +65,14 @@ export default function EmpresasPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <ModuleTabs tabs={REGULATORIO_TABS} />
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-text-primary">Empresas Reguladas</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold text-text-primary">Empresas Reguladas</h1>
+            <HelpTooltip text="Empresas e concessionárias identificadas nas deliberações. Risco calculado pela taxa de aprovação histórica." />
+          </div>
           <p className="text-sm text-text-muted mt-0.5">
             Empresas e concessionárias sob supervisão regulatória — extraídas das deliberações
           </p>
@@ -174,6 +181,23 @@ export default function EmpresasPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold text-text-primary text-sm">{empresa.nome}</h3>
+                        {/* Badge de risco */}
+                        {empresa.risco_regulatorio && (
+                          <span className={cn(
+                            "text-xs px-2 py-0.5 rounded-full font-mono border",
+                            empresa.risco_regulatorio === "alto"  ? "bg-red-500/15 text-red-400 border-red-500/25" :
+                            empresa.risco_regulatorio === "medio" ? "bg-amber-500/15 text-amber-400 border-amber-500/25" :
+                                                                    "bg-emerald-500/15 text-emerald-400 border-emerald-500/25"
+                          )}>
+                            {empresa.risco_regulatorio === "alto" ? "Risco Alto" : empresa.risco_regulatorio === "medio" ? "Risco Médio" : "Risco Baixo"}
+                          </span>
+                        )}
+                        {/* Tendência */}
+                        {empresa.tendencia_direcao && empresa.tendencia_direcao !== "estavel" && (
+                          empresa.tendencia_direcao === "melhorando"
+                            ? <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                            : <TrendingDown className="w-3.5 h-3.5 text-red-400" />
+                        )}
                         {empresa.microtema_principal && (
                           <span
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
@@ -321,13 +345,20 @@ export default function EmpresasPage() {
                       </div>
                     )}
 
-                    {/* Link to all deliberações for this company */}
-                    <div className="text-right">
+                    {/* Links */}
+                    <div className="flex items-center justify-end gap-4">
                       <Link
                         href={`/dashboard/deliberacoes?search=${encodeURIComponent(empresa.nome)}`}
-                        className="text-xs text-brand hover:underline"
+                        className="text-xs text-text-muted hover:text-brand transition-colors"
                       >
-                        Ver todas as deliberações desta empresa →
+                        Ver deliberações →
+                      </Link>
+                      <Link
+                        href={`/dashboard/empresas/${encodeURIComponent(empresa.nome)}`}
+                        className="text-xs text-brand hover:underline flex items-center gap-1"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Perfil completo
                       </Link>
                     </div>
                   </div>

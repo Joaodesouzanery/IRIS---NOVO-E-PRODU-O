@@ -5,6 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { MicrotemaStats, Agencia } from "@/types";
 import { getMicrotemaLabel, getMicrotemaColor, CATEGORIAS_REGULATORIAS, formatNumber } from "@/lib/utils";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { REGULATORIO_TABS } from "@/lib/module-tabs";
 
 const ANOS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
 
@@ -52,6 +54,7 @@ export default function MicrotemasPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <ModuleTabs tabs={REGULATORIO_TABS} />
       {/* Header */}
       <div>
         <h1 className="text-xl font-semibold text-text-primary">Microtemas Regulatórios</h1>

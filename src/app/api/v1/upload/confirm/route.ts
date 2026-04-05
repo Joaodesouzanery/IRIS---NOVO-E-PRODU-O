@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { isDemo } from "@/lib/server/is-demo";
 import type {
   ConfirmDelib,
   BatchConfirmResponse,
@@ -29,9 +30,6 @@ const MICROTEMAS_VALIDOS = new Set<string>([
 
 const RE_ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-function isDemo(): boolean {
-  return !process.env.NEXT_PUBLIC_SUPABASE_URL;
-}
 
 function sanitizeDelib(d: ConfirmDelib): ConfirmDelib {
   return {
@@ -224,10 +222,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           .single();
 
         if (deliberacaoErr || !delib) {
+          console.error("[upload/confirm] Erro ao inserir deliberação:", deliberacaoErr);
           results.push({
             filename: d.filename,
             status: "error",
-            error: deliberacaoErr?.message ?? "Erro ao inserir deliberação",
+            error: "Erro ao inserir deliberação",
           });
           continue;
         }
@@ -267,8 +266,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           deliberacao_id: delib.id as string,
         });
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        results.push({ filename: d.filename, status: "error", error: message });
+        console.error("[upload/confirm] Erro inesperado ao processar deliberação:", err);
+        results.push({ filename: d.filename, status: "error", error: "Erro interno ao processar deliberação" });
       }
     }
 

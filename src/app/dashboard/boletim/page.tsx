@@ -13,6 +13,8 @@ import {
   Calendar, Bell, FileText, Users, Tag, Building2, ShieldCheck,
   AlignLeft, Loader2, X,
 } from "lucide-react";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { CONFIG_TABS } from "@/lib/module-tabs";
 
 const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
 
@@ -309,6 +311,7 @@ export default function BoletimPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <ModuleTabs tabs={CONFIG_TABS} />
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>

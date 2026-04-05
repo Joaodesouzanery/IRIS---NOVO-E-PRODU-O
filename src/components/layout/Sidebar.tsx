@@ -4,23 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard,
-  Upload,
   FileText,
   BarChart3,
   Users,
-  Vote,
-  Lightbulb,
+  TrendingUp,
   Building2,
   ChevronDown,
   Activity,
-  TrendingUp,
-  Grid3x3,
-  Tag,
-  Building,
-  Layers,
-  ShieldCheck,
-  Mail,
 } from "lucide-react";
 
 interface NavItem {
@@ -29,62 +19,53 @@ interface NavItem {
   icon: React.ElementType;
 }
 
-interface NavSection {
-  title: string;
-  items: NavItem[];
-}
-
-const NAV_SECTIONS: NavSection[] = [
-  {
-    title: "Menu Principal",
-    items: [
-      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { label: "Upload de PDFs", href: "/dashboard/upload", icon: Upload },
-      { label: "Deliberações", href: "/dashboard/deliberacoes", icon: FileText },
-    ],
-  },
-  {
-    title: "Análise",
-    items: [
-      { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
-      { label: "→ Temas", href: "/dashboard/analytics/temas", icon: Tag },
-      { label: "→ Diretores", href: "/dashboard/analytics/diretores", icon: Users },
-      { label: "Mandatos", href: "/dashboard/mandatos", icon: Users },
-      { label: "Votação", href: "/dashboard/votacao", icon: Vote },
-      { label: "Dashboard 360°", href: "/dashboard/360", icon: Layers },
-      { label: "Insights", href: "/dashboard/insights", icon: Lightbulb },
-      { label: "Governança", href: "/dashboard/governanca", icon: ShieldCheck },
-    ],
-  },
-  {
-    title: "Painel Regulatório",
-    items: [
-      { label: "Visão Geral",  href: "/dashboard/painel-regulatorio",           icon: TrendingUp },
-      { label: "Setores",      href: "/dashboard/painel-regulatorio/setores",    icon: Grid3x3 },
-      { label: "Microtemas",   href: "/dashboard/painel-regulatorio/microtemas", icon: Tag },
-      { label: "Empresas",     href: "/dashboard/empresas",                      icon: Building },
-    ],
-  },
-  {
-    title: "Comunicação",
-    items: [
-      { label: "Boletim", href: "/dashboard/boletim", icon: Mail },
-    ],
-  },
-  {
-    title: "Configurações",
-    items: [
-      { label: "Agências", href: "/dashboard/agencias", icon: Building2 },
-    ],
-  },
+const NAV_ITEMS: NavItem[] = [
+  { label: "Deliberações", href: "/dashboard/deliberacoes", icon: FileText },
+  { label: "Diretores",    href: "/dashboard/analytics/diretores", icon: Users },
+  { label: "Análise",      href: "/dashboard/analytics", icon: BarChart3 },
+  { label: "Regulatório",  href: "/dashboard/painel-regulatorio", icon: TrendingUp },
+  { label: "Configurações",href: "/dashboard/agencias", icon: Building2 },
 ];
+
+// Which URL prefixes activate each sidebar item
+const MODULE_PATHS: Record<string, string[]> = {
+  "/dashboard/deliberacoes": [
+    "/dashboard",
+    "/dashboard/upload",
+    "/dashboard/deliberacoes",
+  ],
+  "/dashboard/analytics/diretores": [
+    "/dashboard/analytics/diretores",
+    "/dashboard/mandatos",
+    "/dashboard/votacao",
+  ],
+  "/dashboard/analytics": [
+    "/dashboard/analytics",
+    "/dashboard/analytics/temas",
+    "/dashboard/360",
+    "/dashboard/insights",
+    "/dashboard/governanca",
+  ],
+  "/dashboard/painel-regulatorio": [
+    "/dashboard/painel-regulatorio",
+    "/dashboard/empresas",
+  ],
+  "/dashboard/agencias": [
+    "/dashboard/agencias",
+    "/dashboard/boletim",
+  ],
+};
 
 export function Sidebar() {
   const pathname = usePathname();
 
   const isActive = (href: string) => {
-    if (href === "/dashboard") return pathname === "/dashboard";
-    return pathname.startsWith(href);
+    const paths = MODULE_PATHS[href] ?? [href];
+    return paths.some((p) =>
+      p === "/dashboard"
+        ? pathname === "/dashboard"
+        : pathname === p || pathname.startsWith(p + "/")
+    );
   };
 
   return (
@@ -110,29 +91,24 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
-        {NAV_SECTIONS.map((section) => (
-          <div key={section.title}>
-            <p className="section-label px-3 mb-1">{section.title}</p>
-            <ul className="space-y-0.5">
-              {section.items.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.href);
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      className={cn("sidebar-item", active && "active")}
-                    >
-                      <Icon className="w-4 h-4 shrink-0" />
-                      <span>{item.label}</span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+      <nav className="flex-1 px-3 py-4 overflow-y-auto">
+        <ul className="space-y-0.5">
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={cn("sidebar-item", active && "active")}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span>{item.label}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </nav>
 
       {/* Footer */}

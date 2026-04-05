@@ -4,16 +4,14 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { isDemo } from "@/lib/server/is-demo";
 
-function isDemo(req: NextRequest): boolean {
-  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
-}
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { jobId: string } }
 ) {
-  if (isDemo(req)) {
+  if (isDemo()) {
     return NextResponse.json({ error: "Job não encontrado" }, { status: 404 });
   }
 

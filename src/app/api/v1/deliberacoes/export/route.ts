@@ -7,10 +7,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { demoData } from "@/lib/demo-data";
 import { isLocalMode, getSyncedDelibs } from "@/lib/server/local-data-store";
 import { computeDelibList } from "@/lib/server/analytics-engine";
+import { isDemo } from "@/lib/server/is-demo";
 
-function isDemo(req: NextRequest): boolean {
-  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
-}
 
 const escape = (v: unknown) => {
   if (v === null || v === undefined) return "";
@@ -28,7 +26,7 @@ const HEADERS = [
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
 
-  if (isDemo(req)) {
+  if (isDemo()) {
     if (isLocalMode()) {
       const all = computeDelibList(getSyncedDelibs(), { limit: 5000 }).data;
       const rows = all.map((r: any) =>

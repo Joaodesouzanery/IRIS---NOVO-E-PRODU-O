@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type { Deliberacao } from "@/types";
+import { isDemo } from "@/lib/server/is-demo";
 import {
   setSyncedDelibs,
   getSyncedDelibs,
@@ -15,6 +16,14 @@ import {
 } from "@/lib/server/local-data-store";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  // Sync endpoint é exclusivo do modo demo — nunca disponível em produção
+  if (!isDemo()) {
+    return NextResponse.json(
+      { error: "Sync endpoint indisponível em modo produção" },
+      { status: 403 }
+    );
+  }
+
   try {
     const body = await req.json();
     const { deliberacoes, mode } = body as {
@@ -41,6 +50,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 }
 
 export async function GET(): Promise<NextResponse> {
+  if (!isDemo()) {
+    return NextResponse.json(
+      { error: "Sync endpoint indisponível em modo produção" },
+      { status: 403 }
+    );
+  }
+
   return NextResponse.json({
     mode: getDataMode(),
     count: getSyncedDelibs().length,

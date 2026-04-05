@@ -4,12 +4,10 @@
  */
 
 import { NextRequest } from "next/server";
+import { isDemo } from "@/lib/server/is-demo";
 
 export const dynamic = "force-dynamic";
 
-function isDemo(req: NextRequest): boolean {
-  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
-}
 
 export async function GET(
   req: NextRequest,
@@ -18,7 +16,7 @@ export async function GET(
   const { jobId } = params;
 
   // Em modo demo, não há jobs reais
-  if (isDemo(req)) {
+  if (isDemo()) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       start(controller) {

@@ -7,12 +7,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { demoData } from "@/lib/demo-data";
 import { isLocalMode, getSyncedDelibs } from "@/lib/server/local-data-store";
 import { computeDelibById } from "@/lib/server/analytics-engine";
+import { isDemo } from "@/lib/server/is-demo";
 
 const ALLOWED_PATCH_FIELDS = new Set([
   "numero_deliberacao",
   "reuniao_ordinaria",
   "data_reuniao",
   "interessado",
+  "assunto",
   "processo",
   "microtema",
   "resultado",
@@ -21,15 +23,12 @@ const ALLOWED_PATCH_FIELDS = new Set([
   "fundamento_decisao",
 ]);
 
-function isDemo(req: NextRequest): boolean {
-  return !process.env.NEXT_PUBLIC_SUPABASE_URL || req.nextUrl.searchParams.get("demo") === "1";
-}
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (isDemo(req)) {
+  if (isDemo()) {
     if (isLocalMode()) {
       const found = computeDelibById(getSyncedDelibs(), params.id);
       if (!found) return NextResponse.json({ error: "Não encontrada" }, { status: 404 });
@@ -48,7 +47,7 @@ export async function GET(
   const { data, error } = await db
     .from("deliberacoes")
     .select(
-      `*, votos (id, tipo_voto, is_divergente, is_nominal, diretor_id,
+      `*, agencias (sigla, nome), votos (id, tipo_voto, is_divergente, is_nominal, diretor_id,
         diretores (nome))`
     )
     .eq("id", params.id)
@@ -60,6 +59,8 @@ export async function GET(
 
   const formatted = {
     ...data,
+    agencia: data.agencias ?? null,
+    agencias: undefined,
     votos: (data.votos ?? []).map((v: any) => ({
       id: v.id,
       tipo_voto: v.tipo_voto,
@@ -77,7 +78,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (isDemo(req)) {
+  if (isDemo()) {
     return NextResponse.json(
       { error: "Edição não disponível em modo demo" },
       { status: 403 }

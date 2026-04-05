@@ -12,6 +12,8 @@ import {
   ShieldCheck, AlertTriangle, CheckCircle, TrendingUp,
   Activity, Database, Users, Zap,
 } from "lucide-react";
+import { ModuleTabs } from "@/components/ui/ModuleTabs";
+import { ANALISE_TABS } from "@/lib/module-tabs";
 
 const ANOS = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
 
@@ -161,6 +163,7 @@ export default function GovernancaPage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      <ModuleTabs tabs={ANALISE_TABS} />
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
