@@ -7,7 +7,7 @@ import type { Deliberacao } from "@/types";
 import { formatDate, getMicrotemaLabel, cn } from "@/lib/utils";
 import {
   ArrowLeft, CheckCircle, XCircle, Pencil, Save, X,
-  ChevronDown, ChevronUp, Users, FileText, ShieldCheck, Award,
+  ChevronDown, ChevronUp, Users, FileText, ShieldCheck, Award, Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { getLocalDelibs, updateLocalDelib } from "@/lib/local-store";
@@ -66,6 +66,87 @@ function resultadoColor(r: string | null) {
   if (r === "Indeferido") return "text-error";
   if (r === "Parcialmente Deferido") return "text-amber-400";
   return "text-text-secondary";
+}
+
+// ─── Deliberações Similares ──────────────────────────────────────────────────
+
+interface SimilarItem {
+  id: string;
+  numero_deliberacao: string | null;
+  data_reuniao: string | null;
+  interessado: string | null;
+  assunto: string | null;
+  resultado: string | null;
+  microtema: string | null;
+  similarity: number;
+  method: "vector" | "text";
+}
+
+function SimilaresSection({ deliberacaoId, microtema }: { deliberacaoId: string; microtema?: string | null }) {
+  const { data, isLoading } = useQuery<{ results: SimilarItem[] }>({
+    queryKey: ["similares", deliberacaoId],
+    queryFn: () => api.get(`/deliberacoes/similar?id=${deliberacaoId}&limit=5`),
+    staleTime: 5 * 60_000,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="card">
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles className="w-4 h-4 text-brand" />
+          <p className="section-label">Deliberações Similares</p>
+        </div>
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-12 rounded-lg bg-bg-elevated animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const results = data?.results ?? [];
+  if (results.length === 0) return null;
+
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-brand" />
+          <p className="section-label">Deliberações Similares</p>
+        </div>
+        <span className="text-xs text-text-muted">
+          {results[0]?.method === "vector" ? "busca semântica" : "busca por tema"}
+        </span>
+      </div>
+      <div className="space-y-2">
+        {results.map((r) => (
+          <Link
+            key={r.id}
+            href={`/dashboard/deliberacoes/${r.id}`}
+            className="flex items-center justify-between p-3 rounded-lg bg-bg-elevated hover:bg-bg-hover border border-border transition-colors group"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-text-primary truncate group-hover:text-brand transition-colors">
+                {r.numero_deliberacao ?? "—"} · {r.interessado ?? "Sem interessado"}
+              </p>
+              <p className="text-xs text-text-muted truncate mt-0.5">{r.assunto ?? "Sem assunto"}</p>
+            </div>
+            <div className="ml-3 flex items-center gap-2 shrink-0">
+              {r.microtema && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-bg-base border border-border text-text-muted">
+                  {getMicrotemaLabel(r.microtema)}
+                </span>
+              )}
+              <span className={cn("text-xs font-medium", resultadoColor(r.resultado))}>
+                {r.resultado ?? "—"}
+              </span>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // ─── Página ───────────────────────────────────────────────────────────────────
@@ -497,6 +578,11 @@ export default function DeliberacaoDetailPage({ params }: { params: { id: string
           <p className="text-sm text-text-muted italic">Não informado.</p>
         )}
       </div>
+
+      {/* ── Deliberações Similares ────────────────────────────────────────── */}
+      {!isLocal && (
+        <SimilaresSection deliberacaoId={params.id} microtema={deliberacao.microtema} />
+      )}
 
       {/* ── Dados Brutos de Extração (IA) ─────────────────────────────────── */}
       {deliberacao.raw_extraction && (

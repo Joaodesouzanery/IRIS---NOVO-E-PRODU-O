@@ -141,6 +141,25 @@ export async function extractPdfText(
   return { text, pageCount, charsPerPage };
 }
 
+// ─── Chunking: divide texto em múltiplas deliberações ────────────────────
+// Uma ata de reunião pode conter N deliberações separadas por marcadores como
+// "DELIBERAÇÃO Nº 001/2024". Cada chunk é processado como um registro independente.
+const RE_DELIB_BOUNDARY = /(?=DELIBERA[ÇC][AÃ]O\s*N[ºo°]?\s*[\d])/gi;
+
+export function splitIntoDeliberacoes(text: string): string[] {
+  // Extrai cabeçalho da reunião (primeiros 500 chars antes da 1ª deliberação)
+  const firstBoundary = text.search(/DELIBERA[ÇC][AÃ]O\s*N[ºo°]?\s*[\d]/i);
+  const header = firstBoundary > 0 ? text.slice(0, Math.min(firstBoundary, 500)) : "";
+
+  RE_DELIB_BOUNDARY.lastIndex = 0;
+  const parts = text.split(RE_DELIB_BOUNDARY).filter((p) => p.trim().length > 100);
+
+  if (parts.length < 2) return [text]; // sem split — comportamento atual
+
+  // Cada chunk recebe o cabeçalho da reunião para preservar data e número ordinal
+  return parts.map((chunk, i) => (i === 0 ? chunk : header + chunk));
+}
+
 // ─── Hash SHA-256 para deduplicação ──────────────────────────────────────
 export async function sha256Hex(buffer: Buffer): Promise<string> {
   const hashBuffer = await crypto.subtle.digest("SHA-256", new Uint8Array(buffer));

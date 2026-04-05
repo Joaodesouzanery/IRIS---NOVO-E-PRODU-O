@@ -10,7 +10,7 @@ import { IrisAreaChart } from "@/components/charts/IrisAreaChart";
 import { IrisLineChart } from "@/components/charts/IrisLineChart";
 import { ChartWrapper } from "@/components/charts/ChartWrapper";
 import { getMicrotemaLabel, formatNumber, cn } from "@/lib/utils";
-import { TrendingUp, Building2, Tag, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { TrendingUp, Building2, Tag, ArrowUpRight, ArrowDownRight, GitMerge } from "lucide-react";
 import { ModuleTabs } from "@/components/ui/ModuleTabs";
 import { ANALISE_TABS } from "@/lib/module-tabs";
 
@@ -59,6 +59,14 @@ export default function AnalyticsTemasPage() {
   const { data: analytics, isLoading: loadAnalytics } = useQuery({
     queryKey: ["mandatos", "analytics", agenciaId],
     queryFn: () => api.get<MandatosAnalytics>(`/mandatos/analytics${agenciaId ? `?agencia_id=${agenciaId}` : ""}`),
+  });
+
+  const { data: correlacao } = useQuery<{
+    topPares: Array<{ tema_a: string; tema_b: string; coeficiente: number; co_ocorrencias: number }>;
+    totalReunioes: number;
+  }>({
+    queryKey: ["correlacao-microtemas", agenciaId],
+    queryFn: () => api.get(`/dashboard/correlacao-microtemas${agenciaId ? `?agencia_id=${agenciaId}` : ""}`),
   });
 
   // ── Derived data ──────────────────────────────────────────────────────────
@@ -310,6 +318,49 @@ export default function AnalyticsTemasPage() {
           </div>
         )}
       </div>
+
+      {/* ── Correlação entre Microtemas ────────────────────────────────────── */}
+      {correlacao && correlacao.topPares.length > 0 && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-3">
+            <GitMerge className="w-4 h-4 text-brand" />
+            <p className="section-label">Correlação entre Microtemas</p>
+            <span className="ml-auto text-xs text-text-muted font-mono">
+              {correlacao.totalReunioes} reuniões analisadas
+            </span>
+          </div>
+          <p className="text-xs text-text-muted mb-4">
+            Temas que co-ocorrem com mais frequência nas mesmas reuniões (coeficiente 0–1).
+          </p>
+          <div className="space-y-2">
+            {correlacao.topPares.map((par, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-brand/10 text-brand border border-brand/20 shrink-0 truncate max-w-[120px]">
+                    {getMicrotemaLabel(par.tema_a)}
+                  </span>
+                  <span className="text-text-muted text-xs">↔</span>
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-brand/10 text-brand border border-brand/20 shrink-0 truncate max-w-[120px]">
+                    {getMicrotemaLabel(par.tema_b)}
+                  </span>
+                </div>
+                <div className="w-24 h-1.5 rounded-full bg-bg-base border border-border overflow-hidden shrink-0">
+                  <div
+                    className="h-full rounded-full bg-brand transition-all"
+                    style={{ width: `${par.coeficiente * 100}%` }}
+                  />
+                </div>
+                <span className="text-xs font-mono text-text-secondary w-10 text-right shrink-0">
+                  {par.coeficiente.toFixed(2)}
+                </span>
+                <span className="text-xs text-text-muted shrink-0 w-16 text-right">
+                  {par.co_ocorrencias}× juntos
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -234,138 +234,417 @@ Razões prováveis:
 
 ## 4. Features inspiradas na Palantir — adaptáveis ao IRIS
 
+> Versão expandida · 8 features com arquitetura técnica, mockups e casos de uso concretos.
+
+---
+
 ### 4.1 Dossiê Regulatório por Empresa (inspirado no Dossier do Gotham)
 
-**O que a Palantir tem:** O _Dossier_ é um editor colaborativo que agrega dados de múltiplas fontes sobre uma entidade em um único documento vivo — anotações, evidências, timelines.
+**O que a Palantir tem:** O _Dossier_ é um editor colaborativo que agrega dados de múltiplas fontes sobre uma entidade em um único documento vivo — anotações, evidências, timelines — acessível por toda a equipe de investigação.
 
-**Adaptação para o IRIS:**
+**Status no IRIS:** ✅ Implementado parcialmente — a página `/dashboard/empresas/[id]` já existe.
 
-Uma "Pasta da Empresa" que consolida em uma tela:
-- Timeline cronológica de todas as deliberações
-- Histórico de multas e indeferimentos
-- Diretores que mais votaram em processos da empresa
-- Documentos SEI vinculados
-- Notas internas da equipe da agência
-- Score de risco com evolução histórica
+**Implementação concluída (neste ciclo):**
+- Timeline cronológica vertical com eventos coloridos por resultado (verde/vermelho/cinza)
+- Score de risco com tendência histórica
+- Diretores envolvidos com contagem de votos favoráveis/contrários
+- Tabela de histórico completo com links para cada deliberação
 
+**Próximos passos:**
+- Notas colaborativas internas (campo `notas` por empresa, salvos no banco)
+- Documentos SEI vinculados via integração gov.br
+- Exportação do dossiê em PDF timbrado
+
+**Interface atual:**
 ```
-/dashboard/360/[empresa_id]  →  já existe parcialmente
-  ├── Timeline (novo)
-  ├── Votação por diretor (novo)
-  ├── Documentos SEI (novo — requer integração)
-  └── Notas colaborativas (novo)
+┌─────────────────────────────────────────────────────────┐
+│  CCR Via Bandeirantes S.A.         [Risco Baixo] [↑]    │
+│  132 deliberações · Última: 15/03/2024                  │
+├─────────────────────────────────────────────────────────┤
+│ TIMELINE REGULATÓRIA                                     │
+│  ●  2024-03-15  tarifa    Deferido  Delib. 006/2024      │
+│  ●  2024-02-08  obras     Deferido  Delib. 002/2024      │
+│  ○  2023-11-22  multa     Indeferido  Delib. 089/2023    │
+├─────────────────────────────────────────────────────────┤
+│ DIRETORES ENVOLVIDOS       Taxa Aprovação: 78%          │
+│  A.I. Barnabé   ✓ 48  ✗ 2                              │
+│  D.A. Zanatto   ✓ 45  ✗ 3                              │
+└─────────────────────────────────────────────────────────┘
 ```
 
-**Complexidade:** Média — boa parte dos dados já existe no banco.
+**API:** `GET /api/v1/empresas/{nome_encoded}` — retorna `EmpresaDetalhe` com `historico: Deliberacao[]`
+
+**Complexidade:** Média — dados já existem, falta UI de notas e integração SEI.
 
 ---
 
 ### 4.2 Grafo Diretores-Empresas (inspirado no Network Analysis do Gotham)
 
-**O que a Palantir tem:** Visualização de grafos que mostra conexões entre entidades — quem votou com quem, quais empresas se relacionam através de diretores comuns.
+**O que a Palantir tem:** O _Gotham_ é famoso por sua visualização de grafos para análise de redes — quem se conecta com quem, força dos laços, clusters de relacionamento. Usado inicialmente para inteligência militar, mas o padrão é aplicável a qualquer rede de entidades.
 
 **Adaptação para o IRIS:**
 
-Grafo interativo (D3.js / vis.js) onde:
-- **Nós azuis** = diretores
-- **Nós laranjas** = empresas
-- **Arestas** = deliberações em que o diretor votou sobre a empresa
-- **Espessura da aresta** = número de votos
-- **Cor da aresta** = direção predominante (verde = favorável, vermelho = desfavorável)
+Grafo interativo com D3.js `force-simulation`:
 
-Casos de uso:
-- Identificar se um diretor tem padrão consistente (sempre favorável) com uma empresa específica
-- Detectar empresas que aparecem em múltiplas deliberações com diretores diferentes
-- Visualizar clusters temáticos (empresas do setor de pedágios vs. concessões aeroportuárias)
+```
+Nós:
+  🔵 Diretores  (tamanho = número de deliberações)
+  🟠 Empresas   (tamanho = número de deliberações)
+  🟢 Microtemas (nós secundários, opcional)
 
-**Complexidade:** Alta — requer biblioteca de grafo e modelagem de relacionamentos.
+Arestas:
+  ─── Voto favorable  (verde, espessura = contagem)
+  ─── Voto desfavorável (vermelho)
+  ─── Co-ocorrência em reunião (cinza pontilhado)
+```
+
+**Casos de uso regulatórios concretos:**
+
+| Pergunta | Como o grafo responde |
+|---|---|
+| "O Diretor X tem viés favorável à empresa Y?" | Aresta vermelha espessa entre X e Y |
+| "Quais empresas são reguladas pelo mesmo grupo de diretores?" | Cluster visual de nós laranjas próximos |
+| "Qual empresa concentra mais poder regulatório?" | Nó laranja de maior raio |
+| "Quais diretores participam de mais processos de obras?" | Aresta azul espessa ligando diretor ao nó 'obras' |
+
+**Schema de dados para o grafo:**
+
+```typescript
+interface GraphData {
+  nodes: Array<{
+    id: string;
+    type: "diretor" | "empresa" | "microtema";
+    label: string;
+    size: number;      // proporcional ao número de deliberações
+    color: string;
+  }>;
+  edges: Array<{
+    source: string;   // diretor_id
+    target: string;   // empresa nome ou microtema
+    weight: number;   // número de deliberações
+    direction: "favoravel" | "desfavoravel" | "misto";
+  }>;
+}
+```
+
+**Endpoint:** `GET /api/v1/analytics/grafo?agencia_id=...` (a criar)
+
+**Complexidade:** Alta — requer `d3-force` ou `vis-network`, endpoint de agregação e UI de zoom/filtro.
 
 ---
 
 ### 4.3 Ontologia Regulatória Brasileira (inspirado no Ontology do Foundry)
 
-**O que a Palantir tem:** O _Ontology_ é o coração do Foundry — um modelo semântico de objetos (entidades) e seus relacionamentos, que dá significado aos dados e permite que diferentes pipelines falem a mesma linguagem.
+**O que a Palantir tem:** O _Ontology_ do Foundry é um modelo semântico central — cada entidade do mundo real (pessoa, empresa, evento) é representada como um "objeto" com propriedades e relacionamentos tipados. Permite que diferentes sistemas falem a mesma linguagem e que dados sejam exportados em formato interoperável.
 
-**Adaptação para o IRIS:**
+**Adaptação para o IRIS — definição formal:**
 
-Definir formalmente a ontologia do domínio regulatório brasileiro:
+```typescript
+// Ontologia do domínio regulatório brasileiro
+// Compatível com JSON-LD + schema.org/GovernmentPermit
 
+interface Agencia {
+  "@type": "GovernmentOrganization";
+  sigla: string;           // "ARTESP"
+  nome_completo: string;   // "Agência de Transporte do Estado de São Paulo"
+  esfera: "federal" | "estadual";
+  setor: string;           // "transporte", "energia", "telecomunicações"
+  diretores: Diretor[];
+  deliberacoes: Deliberacao[];
+}
+
+interface Deliberacao {
+  "@type": "GovernmentPermit";
+  numero: string;          // "001/2024"
+  data: ISO8601Date;
+  processo_sei: string;    // "SEI nº 001.0100.000001.2024"
+  interessado: Empresa;
+  resultado: ResultadoEnum;
+  microtema: MicrotemaEnum;
+  votos: Voto[];
+  fundamento: string;      // texto legal da decisão
+  embedding?: number[];    // vetor semântico (pgvector)
+}
+
+interface Empresa {
+  "@type": "Organization";
+  nome: string;
+  cnpj?: string;
+  setor?: string;
+  score_risco: "alto" | "medio" | "baixo";
+  deliberacoes: Deliberacao[];
+}
 ```
-Agência
-  └── tem muitos → Diretores
-  └── tem muitos → Deliberações
-  └── fiscaliza muitas → Empresas
 
-Diretor
-  └── tem um → Mandato (ativo/encerrado)
-  └── participa de muitos → Votos
+**Exportação JSON-LD (para TCU, CGU, pesquisadores):**
 
-Deliberação
-  └── tem um → Processo SEI
-  └── tem um → Microtema
-  └── tem um → Resultado
-  └── tem muitos → Votos
-  └── afeta uma → Empresa (Interessado)
-
-Empresa
-  └── tem muitos → Processos SEI
-  └── tem um → Score de Risco
+```json
+{
+  "@context": "https://schema.org",
+  "@type": "GovernmentPermit",
+  "identifier": "ARTESP/DEL/001/2024",
+  "name": "Deliberação 001/2024 - ARTESP",
+  "datePublished": "2024-01-15",
+  "issuedBy": { "@type": "GovernmentOrganization", "name": "ARTESP" },
+  "about": { "@type": "Organization", "name": "CCR Via Bandeirantes" },
+  "governmentBeneficiaryType": "Concessão de Rodovias",
+  "permitAudience": { "@type": "Audience", "audienceType": "Transporte" }
+}
 ```
 
-Benefício prático: exportar os dados como **JSON-LD** (Linked Data) para interoperabilidade entre agências e com sistemas do governo federal (e-MEC, SIESG, TCU).
+**Valor estratégico:** Permite integração com o Portal da Transparência, LicitaNet e SIESG sem necessidade de adaptadores customizados.
 
-**Complexidade:** Média — é principalmente modelagem e documentação de esquema, não implementação.
+**Complexidade:** Média — modelagem bem definida, implementação é serialização + endpoint de exportação.
 
 ---
 
 ### 4.4 Audit Trail de Extração (inspirado no AIP Inference History)
 
-**O que a Palantir tem:** O AIP registra o histórico de todas as inferências de modelos — qual versão do modelo gerou qual resultado, quem aprovou, quando foi corrigido manualmente.
+**O que a Palantir tem:** O _AIP_ mantém histórico completo de cada inferência: qual modelo gerou qual output, com que dados de entrada, quem aprovou, quem corrigiu. Permite auditoria regulatória de sistemas de IA.
 
-**Adaptação para o IRIS:**
+**Status no IRIS:** Campo `raw_extracted` (JSONB) já existe no banco — precisa ser enriquecido.
 
-Rastrear a proveniência de cada campo extraído:
+**Extensão do schema atual:**
 
-```json
-{
-  "numero_deliberacao": {
-    "valor": "001/2024",
-    "fonte": "regex:RE_DELIBERACAO",
-    "confiança": 0.95,
-    "corrigido_por": null,
-    "corrigido_em": null
-  },
-  "resultado": {
-    "valor": "Deferido",
-    "fonte": "regex:RE_RESULTADO",
-    "confiança": 0.80,
-    "corrigido_por": "user:joao@artesp.sp.gov.br",
-    "corrigido_em": "2024-03-15T14:22:00Z"
-  }
+```typescript
+// Extensão de raw_extracted para incluir proveniência por campo
+interface ExtractionAuditTrail {
+  campos: {
+    [fieldName: string]: {
+      valor: string | null;
+      fonte: "regex" | "llm" | "manual";
+      regex_pattern?: string;       // ex: "RE_DELIBERACAO"
+      llm_model?: string;           // ex: "claude-haiku-4-5"
+      confianca: number;            // 0.0–1.0
+      corrigido_por?: string;       // email do usuário
+      corrigido_em?: string;        // ISO timestamp
+      valor_original?: string;      // valor antes da correção manual
+    };
+  };
+  pipeline_version: string;         // "1.2.0"
+  processing_time_ms: number;
+  chunks_detected: number;          // se o PDF foi dividido
+  llm_enriched: boolean;            // se Claude foi chamado
 }
 ```
 
-Já existe o campo `raw_extracted` (JSONB) no banco — seria uma extensão com metadados de proveniência. Permite auditar onde a IA errou e melhorar o pipeline com feedback humano.
+**UI de auditoria:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Proveniência da Extração — Deliberação 001/2024             │
+├──────────────────┬───────────┬──────────┬───────────────────┤
+│ Campo            │ Fonte     │ Confiança│ Corrigido         │
+├──────────────────┼───────────┼──────────┼───────────────────┤
+│ numero_delib     │ regex     │ 0.95     │ —                 │
+│ data_reuniao     │ regex     │ 0.88     │ —                 │
+│ resultado        │ llm       │ 0.72     │ —                 │
+│ interessado      │ manual    │ 1.00     │ joao@artesp 14:22 │
+│ microtema        │ regex     │ 0.64     │ —                 │
+└──────────────────┴───────────┴──────────┴───────────────────┘
+```
 
-**Complexidade:** Baixa — extensão do schema existente.
+**Valor:** Permite ao TCU e ao CGU auditar como cada campo foi extraído e quem o validou, eliminando a "caixa preta" da IA regulatória.
+
+**Complexidade:** Baixa — extensão do schema + UI na página de detalhe da deliberação.
 
 ---
 
 ### 4.5 Configurador Visual de Extração (inspirado no Pipeline Builder do Foundry)
 
-**O que a Palantir tem:** O _Pipeline Builder_ permite ao usuário não-técnico montar fluxos de transformação de dados arrastando e soltando blocos de processamento.
+**O que a Palantir tem:** O _Pipeline Builder_ do Foundry permite que usuários não-técnicos montem fluxos de ETL (extração, transformação, carga) por meio de blocos visuais arrastáveis — sem escrever código.
 
 **Adaptação para o IRIS:**
 
-Interface para que analistas de cada agência possam:
-- Definir rótulos customizados de campos (ex: ANEEL usa "Processo" em vez de "SEI nº")
-- Adicionar keywords de microtema específicas da agência
-- Configurar thresholds de confiança por campo
-- Definir regras de validação (ex: "número da deliberação deve ter formato NNN/AAAA")
+Cada agência tem vocabulário específico. A ANEEL chama de "Processo" o que a ARTESP chama de "SEI nº". A ANATEL usa "Número de Protocolo". O Configurador resolve isso sem alterar o código-base.
 
-Sem código. Via configuração YAML/JSON versionado por agência, editável em UI.
+**Modelo de configuração por agência (YAML):**
 
-**Complexidade:** Alta — requer UI complexa e engine de configuração.
+```yaml
+# /config/agencias/ANEEL/extracao.yaml
+agencia: ANEEL
+versao: "1.1"
+
+campos:
+  numero_deliberacao:
+    rotulos: ["Resolução Nº", "REN Nº", "Deliberação Nº"]
+    formato: "\\d{3,4}/\\d{4}"
+    obrigatorio: true
+
+  processo:
+    rotulos: ["Processo Nº", "Protocolo SEI", "NIREQ"]
+    formato: "\\d{4}\\.\\d{6}/\\d{4}-\\d{2}"
+
+microtemas_adicionais:
+  - nome: "tarifas_energia"
+    keywords: ["tarifa de energia", "TUSD", "TUST", "bandeira tarifária"]
+  - nome: "concessoes_geracao"
+    keywords: ["outorga de geração", "PCH", "UHE", "usina hidrelétrica"]
+
+confianca:
+  threshold_llm: 0.55   # abaixo disso, chama Claude Haiku
+  threshold_revisao: 0.70  # abaixo disso, marca para revisão humana
+```
+
+**UI de edição:**
+- Tabela editável de rótulos por campo
+- Editor de keywords por microtema com preview em tempo real
+- Sliders de threshold de confiança
+- Botão "Testar com PDF" — processa um arquivo de exemplo e mostra campos extraídos
+
+**Complexidade:** Alta — requer engine de configuração carregada dinamicamente no pipeline.
+
+---
+
+### 4.6 Alertas Personalizáveis (inspirado no AIP Alert System)
+
+**O que a Palantir tem:** O _AIP_ permite criar alertas configuráveis sobre inferências de modelos — "notifique-me quando o modelo de risco superar X" — com integração a e-mail, Slack ou webhooks.
+
+**Adaptação para o IRIS:**
+
+Sistema de regras de alerta sem código, persistido por agência:
+
+```typescript
+interface AlertaRegra {
+  id: string;
+  agencia_id: string;
+  nome: string;             // "Multas excessivas - CCR"
+  ativo: boolean;
+  condicao: {
+    campo: "interessado" | "microtema" | "resultado" | "diretor_id";
+    operador: "eq" | "contains" | "count_gte" | "pct_gte";
+    valor: string | number;
+    janela_dias?: number;   // "nos últimos X dias"
+  };
+  threshold: number;        // ex: 3 (quantidade) ou 0.3 (percentual)
+  acao: {
+    tipo: "email" | "webhook" | "dashboard";
+    destino?: string;       // email ou URL do webhook
+  };
+  severidade: "high" | "medium" | "low";
+}
+```
+
+**Exemplos de regras configuráveis:**
+
+| Regra | Condição | Threshold | Ação |
+|---|---|---|---|
+| "CCR com muitas multas" | interessado=CCR + microtema=multa | 3 em 30 dias | Email |
+| "Consenso baixo no conselho" | resultado + is_divergente | >20% das reuniões | Dashboard |
+| "Empresa nova com indeferimento" | resultado=Indeferido + empresa_nova | 1 ocorrência | Webhook |
+| "Obras acima de R$100M" | microtema=obras + valor_pleito | >100 | Email |
+
+**Engine de avaliação:** roda a cada inserção de nova deliberação, avalia todas as regras ativas da agência.
+
+**Complexidade:** Média — tabela de regras + engine de avaliação via trigger Supabase ou background job.
+
+---
+
+### 4.7 Benchmark entre Agências (inspirado no Foundry Multi-Tenant Analytics)
+
+**O que a Palantir tem:** O _Foundry_ suporta análise comparativa entre "workspaces" (equivalente a agências) com métricas alinhadas — permite que um órgão supervisor compare performance de múltiplas entidades reguladas.
+
+**Adaptação para o IRIS:**
+
+Dashboard comparativo `/dashboard/benchmark` com:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  BENCHMARK DE AGÊNCIAS REGULADORAS              Período: 2024 │
+├────────────────┬──────────┬──────────┬──────────┬────────────┤
+│ Indicador      │ ARTESP   │ ANTT     │ ANEEL    │ Ref. Setor │
+├────────────────┼──────────┼──────────┼──────────┼────────────┤
+│ Taxa Deferimento│  72%    │  68%     │  74%     │  70%       │
+│ Taxa Consenso  │  91%     │  88%     │  95%     │  90%       │
+│ Deliberações/mês│  12     │  8       │  22      │  —         │
+│ Tempo médio    │  —       │  —       │  —       │  —         │
+│ Qualidade IA   │  84%     │  79%     │  82%     │  —         │
+│ Taxa Multas    │  18%     │  24%     │  12%     │  —         │
+├────────────────┼──────────┼──────────┼──────────┼────────────┤
+│ Score Governa. │  79/100  │  72/100  │  83/100  │  —         │
+└────────────────┴──────────┴──────────┴──────────┴────────────┘
+```
+
+**Visualizações:**
+- **Radar chart** — ARTESP vs. ANTT vs. ANEEL em 6 eixos (consenso, deferimento, qualidade, sanções, tempo, cobertura)
+- **Scatter plot** — Volume (eixo X) vs. Taxa Deferimento (eixo Y) por agência
+- **Evolução comparativa** — Linhas para cada agência ao longo do tempo
+
+**Casos de uso para o TCU:**
+- Identificar agências com padrão de governança abaixo da média setorial
+- Comparar evolução de diferentes gestões ao longo do tempo
+- Detectar outliers (agência com taxa de multas 3× acima da média)
+
+**API:** `GET /api/v1/benchmark?agencias=ARTESP,ANTT,ANEEL&year=2024`
+
+**Complexidade:** Média — já existem os dados; é principalmente aggregação paralela e UI.
+
+---
+
+### 4.8 API Pública Regulatória (inspirado na Palantir Ontology API)
+
+**O que a Palantir tem:** A _Palantir Ontology API_ expõe objetos do Foundry via endpoints REST padronizados com autenticação por API key — permitindo que sistemas externos consultem dados diretamente, sem acessar o painel.
+
+**Adaptação para o IRIS:**
+
+API pública com autenticação por API key para consumo por TCU, CGU, pesquisadores e sistemas de terceiros:
+
+**Endpoints públicos (prefixo `/api/public/v1/`):**
+
+```
+GET /deliberacoes
+  ?agencia=ARTESP
+  &microtema=tarifa
+  &resultado=Deferido
+  &date_from=2024-01-01
+  &format=json|csv|jsonld
+
+GET /deliberacoes/{id}
+
+GET /empresas/{nome}/historico
+
+GET /agencias/{sigla}/kpis
+  ?year=2024
+```
+
+**Autenticação via API key:**
+
+```http
+GET /api/public/v1/deliberacoes?agencia=ARTESP
+Authorization: Bearer iris_pub_xxxxxxxxxxxxx
+X-Rate-Limit-Policy: research
+```
+
+**Resposta JSON-LD (para interoperabilidade):**
+
+```json
+{
+  "@context": "https://schema.org",
+  "@type": "GovernmentPermit",
+  "identifier": "ARTESP-DEL-001-2024",
+  "datePublished": "2024-01-15",
+  "name": "Autorização de reajuste tarifário 001/2024",
+  "issuedBy": {
+    "@type": "GovernmentOrganization",
+    "name": "ARTESP",
+    "sameAs": "https://www.artesp.sp.gov.br"
+  },
+  "about": { "@type": "Organization", "name": "CCR Via Bandeirantes S.A." },
+  "result": "Deferido",
+  "regulatoryTopic": "tarifa"
+}
+```
+
+**Modelo de acesso por tier:**
+
+| Tier | Rate Limit | Campos disponíveis | Custo |
+|---|---|---|---|
+| **Pesquisador** | 1.000 req/dia | Todos exceto `raw_text` | Gratuito |
+| **Institucional** | 50.000 req/dia | Todos os campos | Convênio |
+| **Governo** | Ilimitado | Todos + embeddings | Gratuito |
+
+**Documentação automática:** OpenAPI 3.1 gerado via `next-swagger-doc` ou similar.
+
+**Complexidade:** Alta — requer tabela de API keys, middleware de autenticação e rate limiting (Upstash Redis).
 
 ---
 

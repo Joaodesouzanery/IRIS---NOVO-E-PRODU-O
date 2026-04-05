@@ -6,7 +6,7 @@ import type { EmpresaDetalhe } from "@/types";
 import { cn, formatDate, getMicrotemaLabel, getMicrotemaColor } from "@/lib/utils";
 import {
   ArrowLeft, Building, AlertTriangle, TrendingUp, TrendingDown,
-  Minus, CheckCircle, XCircle, Users, ExternalLink,
+  Minus, CheckCircle, XCircle, Users, ExternalLink, Clock,
 } from "lucide-react";
 import Link from "next/link";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
@@ -270,7 +270,61 @@ export default function EmpresaDetailPage({ params }: { params: { id: string } }
         )}
       </div>
 
-      {/* ── Histórico de deliberações ────────────────────────────────────── */}
+      {/* ── Timeline cronológica ─────────────────────────────────────────── */}
+      {empresa.historico.length > 0 && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <Clock className="w-4 h-4 text-brand" />
+            <p className="section-label">Timeline Regulatória</p>
+          </div>
+          <div className="relative">
+            <div className="absolute left-[11px] top-3 bottom-3 w-px bg-border" />
+            <div className="space-y-3">
+              {empresa.historico.slice(0, 15).map((d) => {
+                const isPos = ["Deferido","Aprovado","Aprovado com Ressalvas","Aprovado por Unanimidade","Ratificado","Autorizado","Recomendado","Determinado"].includes(d.resultado ?? "");
+                const isNeg = d.resultado === "Indeferido";
+                const dotCls = isPos
+                  ? "bg-emerald-500 border-emerald-400/40"
+                  : isNeg ? "bg-red-500 border-red-400/40"
+                  : "bg-zinc-500 border-zinc-400/40";
+                return (
+                  <div key={d.id} className="flex items-start gap-3 group">
+                    <div className={cn("w-5 h-5 rounded-full border-2 shrink-0 mt-0.5 z-10", dotCls)} />
+                    <div className="flex-1 min-w-0 pb-3 border-b border-border/30 last:border-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-text-muted font-mono whitespace-nowrap">
+                          {formatDate(d.data_reuniao)}
+                        </span>
+                        {d.microtema && (
+                          <span className="text-xs px-1.5 py-0.5 rounded font-mono"
+                            style={{ background: getMicrotemaColor(d.microtema) + "20", color: getMicrotemaColor(d.microtema) }}>
+                            {getMicrotemaLabel(d.microtema)}
+                          </span>
+                        )}
+                        <ResultadoBadge resultado={d.resultado} />
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-xs text-text-secondary truncate flex-1">
+                          {d.numero_deliberacao ? `Delib. ${d.numero_deliberacao}` : "—"}
+                          {d.assunto ? ` · ${d.assunto}` : ""}
+                        </p>
+                        <Link
+                          href={`/dashboard/deliberacoes/${d.id}`}
+                          className="text-text-muted hover:text-brand transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Histórico de deliberações ───���────────────────────────────────── */}
       <div className="card p-0 overflow-hidden">
         <div className="px-4 py-3 border-b border-border flex items-center gap-2">
           <p className="section-label">Histórico de Deliberações</p>

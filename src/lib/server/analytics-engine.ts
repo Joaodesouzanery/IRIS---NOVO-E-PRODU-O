@@ -827,3 +827,135 @@ export function computeAlertas(delibs: Deliberacao[], agenciaId?: string | null)
     return order[a.severity] - order[b.severity];
   });
 }
+
+// ─── HHI: Índice de Concentração Regulatória ─────────────────────────────────
+// Herfindahl-Hirschman Index adaptado: mede concentração de deliberações por empresa.
+// HHI = Σ (share_i)²  →  0 (disperso) a 1 (monopolizado).
+// Referência: < 0.15 = baixo, 0.15–0.25 = moderado, > 0.25 = alto.
+
+export interface HHIResult {
+  hhi: number;
+  nivel: "baixo" | "moderado" | "alto";
+  total: number;
+  top10: Array<{ empresa: string; count: number; share_pct: number }>;
+}
+
+export function computeHHI(delibs: Deliberacao[], agenciaId?: string | null): HHIResult {
+  const rows = filterByAgencia(delibs, agenciaId).filter((d) => d.interessado);
+
+  const countByEmpresa = new Map<string, number>();
+  for (const d of rows) {
+    const emp = d.interessado!.trim();
+    countByEmpresa.set(emp, (countByEmpresa.get(emp) ?? 0) + 1);
+  }
+
+  const total = rows.length;
+  if (total === 0) return { hhi: 0, nivel: "baixo", total: 0, top10: [] };
+
+  let hhi = 0;
+  for (const count of countByEmpresa.values()) {
+    const share = count / total;
+    hhi += share * share;
+  }
+
+  const nivel: HHIResult["nivel"] = hhi < 0.15 ? "baixo" : hhi < 0.25 ? "moderado" : "alto";
+
+  const top10 = [...countByEmpresa.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([empresa, count]) => ({
+      empresa,
+      count,
+      share_pct: Math.round((count / total) * 1000) / 10,
+    }));
+
+  return { hhi: Math.round(hhi * 10000) / 10000, nivel, total, top10 };
+}
+
+// ─── Correlação entre Microtemas ─────────────────────────────────────────────
+// Para cada par de microtemas, conta em quantas reuniões ambos aparecem juntos.
+// Coeficiente = co_ocorrencias / min(total_a, total_b)  →  0 a 1.
+
+export interface CorrelacaoPar {
+  tema_a: string;
+  tema_b: string;
+  coeficiente: number;
+  co_ocorrencias: number;
+}
+
+export interface CorrelacaoResult {
+  topPares: CorrelacaoPar[];
+  matriz: Record<string, Record<string, number>>;
+  totalReunioes: number;
+}
+
+export function computeCorrelacaoMicrotemas(
+  delibs: Deliberacao[],
+  agenciaId?: string | null
+): CorrelacaoResult {
+  const rows = filterByAgencia(delibs, agenciaId).filter((d) => d.data_reuniao && d.microtema);
+
+  // Agrupa microtemas por reunião
+  const byReuniaoMap = new Map<string, Set<string>>();
+  for (const d of rows) {
+    const key = d.data_reuniao!;
+    if (!byReuniaoMap.has(key)) byReuniaoMap.set(key, new Set());
+    byReuniaoMap.get(key)!.add(d.microtema!);
+  }
+
+  const reunioes = [...byReuniaoMap.values()];
+  const totalReunioes = reunioes.length;
+
+  // Conta ocorrências e co-ocorrências por tema
+  const temaCount = new Map<string, number>();
+  const coOcorrencias = new Map<string, Map<string, number>>();
+
+  for (const temas of reunioes) {
+    const arr = [...temas];
+    for (const t of arr) {
+      temaCount.set(t, (temaCount.get(t) ?? 0) + 1);
+    }
+    for (let i = 0; i < arr.length; i++) {
+      for (let j = i + 1; j < arr.length; j++) {
+        const [a, b] = [arr[i], arr[j]].sort();
+        if (!coOcorrencias.has(a)) coOcorrencias.set(a, new Map());
+        const inner = coOcorrencias.get(a)!;
+        inner.set(b, (inner.get(b) ?? 0) + 1);
+      }
+    }
+  }
+
+  // Constrói lista de pares com coeficiente normalizado
+  const pares: CorrelacaoPar[] = [];
+  for (const [a, bMap] of coOcorrencias) {
+    for (const [b, co] of bMap) {
+      const minCount = Math.min(temaCount.get(a) ?? 1, temaCount.get(b) ?? 1);
+      pares.push({
+        tema_a: a,
+        tema_b: b,
+        coeficiente: Math.round((co / minCount) * 100) / 100,
+        co_ocorrencias: co,
+      });
+    }
+  }
+  pares.sort((x, y) => y.coeficiente - x.coeficiente);
+
+  // Constrói matriz para heatmap
+  const temas = [...temaCount.keys()].sort();
+  const matriz: Record<string, Record<string, number>> = {};
+  for (const t of temas) {
+    matriz[t] = {};
+    for (const u of temas) {
+      if (t === u) {
+        matriz[t][u] = 1;
+      } else {
+        const [a, b] = [t, u].sort();
+        const minC = Math.min(temaCount.get(a) ?? 1, temaCount.get(b) ?? 1);
+        const co = coOcorrencias.get(a)?.get(b) ?? 0;
+        matriz[t][u] = Math.round((co / minC) * 100) / 100;
+      }
+    }
+  }
+
+  return { topPares: pares.slice(0, 10), matriz, totalReunioes };
+}

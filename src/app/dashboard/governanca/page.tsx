@@ -10,7 +10,7 @@ import { IrisBarChart } from "@/components/charts/IrisBarChart";
 import { formatNumber, cn } from "@/lib/utils";
 import {
   ShieldCheck, AlertTriangle, CheckCircle, TrendingUp,
-  Activity, Database, Users, Zap,
+  Activity, Database, Users, Zap, BarChart2,
 } from "lucide-react";
 import { ModuleTabs } from "@/components/ui/ModuleTabs";
 import { ANALISE_TABS } from "@/lib/module-tabs";
@@ -87,6 +87,13 @@ export default function GovernancaPage() {
     queryFn: () => api.get<DeliberacaoPaginada>(`/deliberacoes?limit=100${agenciaId ? `&agencia_id=${agenciaId}` : ""}`),
   });
   const deliberacoes: Deliberacao[] = deliberacoesPag?.data ?? [];
+
+  const { data: concentracao } = useQuery({
+    queryKey: ["concentracao", agenciaId],
+    queryFn: () => api.get<{ hhi: number; nivel: string; total: number; top10: Array<{ empresa: string; count: number; share_pct: number }> }>(
+      `/dashboard/concentracao${agenciaId ? `?agencia_id=${agenciaId}` : ""}`
+    ),
+  });
 
   // ── Derived KPIs ─────────────────────────────────────────────────────────
 
@@ -218,6 +225,54 @@ export default function GovernancaPage() {
           );
         })}
       </div>
+
+      {/* Concentração Regulatória (HHI) */}
+      {concentracao && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-3">
+            <BarChart2 className="w-4 h-4 text-brand" />
+            <p className="section-label">Concentração Regulatória (HHI)</p>
+            <span className={cn(
+              "ml-auto text-xs px-2 py-0.5 rounded-full font-mono font-semibold border",
+              concentracao.nivel === "baixo" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" :
+              concentracao.nivel === "moderado" ? "bg-amber-500/15 text-amber-400 border-amber-500/30" :
+              "bg-red-500/15 text-red-400 border-red-500/30"
+            )}>
+              {concentracao.nivel === "baixo" ? "Baixa" : concentracao.nivel === "moderado" ? "Moderada" : "Alta"} concentração
+            </span>
+          </div>
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-3xl font-mono font-bold text-text-primary">{concentracao.hhi.toFixed(4)}</span>
+            <div className="flex-1">
+              <div className="h-2 rounded-full bg-bg-base border border-border overflow-hidden">
+                <div
+                  className={cn("h-full rounded-full transition-all", concentracao.nivel === "baixo" ? "bg-emerald-500" : concentracao.nivel === "moderado" ? "bg-amber-500" : "bg-red-500")}
+                  style={{ width: `${Math.min(concentracao.hhi * 200, 100)}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-text-muted mt-0.5">
+                <span>0 disperso</span>
+                <span>0.15 moderado</span>
+                <span>0.25+ alto</span>
+              </div>
+            </div>
+          </div>
+          {concentracao.top10.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-text-muted font-mono uppercase tracking-wider mb-2">Top empresas por participação</p>
+              {concentracao.top10.slice(0, 5).map((e) => (
+                <div key={e.empresa} className="flex items-center gap-2">
+                  <span className="text-xs text-text-secondary truncate flex-1">{e.empresa}</span>
+                  <div className="w-20 h-1.5 rounded-full bg-bg-base border border-border overflow-hidden">
+                    <div className="h-full rounded-full bg-brand/60" style={{ width: `${Math.min(e.share_pct, 100)}%` }} />
+                  </div>
+                  <span className="text-xs font-mono text-text-muted w-10 text-right">{e.share_pct}%</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Alertas de Conformidade */}
       {alerts.length > 0 && (

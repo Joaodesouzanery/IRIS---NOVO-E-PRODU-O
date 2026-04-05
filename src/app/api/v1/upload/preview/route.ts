@@ -51,8 +51,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     // Importações server-only
-    const { isPdfBuffer, extractPdfText, sha256Hex } = await import("@/lib/server/pdf-extractor");
+    const { isPdfBuffer, extractPdfText, sha256Hex, splitIntoDeliberacoes } = await import("@/lib/server/pdf-extractor");
     const { extractFields, calcConfidence } = await import("@/lib/server/nlp-extractor");
+    const { extractFieldsWithLLM, mergeWithLLMFields, LLM_CONFIDENCE_THRESHOLD } = await import("@/lib/server/nlp-extractor-llm");
     const { classifyMicrotema, classifyPautaInterna, detectAgenciaSigla } = await import("@/lib/server/classifier");
 
     // Carrega agências uma vez por request
@@ -70,25 +71,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const siglas = allAgencias.map((a) => a.sigla);
 
-    // Processa todos os arquivos em paralelo (antes era sequencial — 5× mais rápido)
-    const results: PreviewResult[] = await Promise.all(
-      files.map(async (file): Promise<PreviewResult> => {
+    // Processa todos os arquivos em paralelo — cada arquivo pode produzir N resultados (chunking)
+    const resultArrays: PreviewResult[][] = await Promise.all(
+      files.map(async (file): Promise<PreviewResult[]> => {
         // Validação de tamanho individual
         if (file.size > MAX_FILE_SIZE) {
-          return {
+          return [{
             ...errorResult(file.name),
             error: `Arquivo muito grande (${(file.size / 1024 / 1024).toFixed(1)} MB, máx 50 MB)`,
-          };
+          }];
         }
 
         const buffer = Buffer.from(await file.arrayBuffer());
 
         // Validação via magic bytes
         if (!isPdfBuffer(buffer)) {
-          return {
+          return [{
             ...errorResult(file.name),
             error: "Arquivo inválido: não é um PDF (magic bytes incorretos)",
-          };
+          }];
         }
 
         // SHA-256 para deduplicação
@@ -116,112 +117,142 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         try {
           extraction = await extractPdfText(buffer);
         } catch {
-          return {
+          return [{
             ...errorResult(file.name, file_hash),
             error: "Falha ao extrair texto do PDF",
-          };
+          }];
         }
 
         if (!extraction.text || extraction.text.length < 50) {
-          return {
+          return [{
             ...errorResult(file.name, file_hash),
             error: "PDF sem texto extraível — possível documento digitalizado (imagem). Use uma versão digital ou converta via Adobe Acrobat antes de enviar.",
             page_count: extraction.pageCount,
-          };
+          }];
         }
 
-        // NLP
-        const fields = extractFields(extraction.text);
-        const { microtema } = classifyMicrotema(extraction.text);
-        const confidence = calcConfidence(fields);
-        const pauta_interna = fields.pauta_interna || classifyPautaInterna(extraction.text);
-
-        // Detecção de agência
+        // Detecção de agência (uma vez por arquivo, baseada no texto completo)
         const agencia_sigla_detected = detectAgenciaSigla(extraction.text, siglas);
         const agencia_id_detected = agencia_sigla_detected
           ? (allAgencias.find((a) => a.sigla === agencia_sigla_detected)?.id ?? null)
           : null;
 
-        // Verificação de duplicata semântica (produção apenas)
-        // 1. Por numero_deliberacao (principal)
-        // 2. Fallback por data_reuniao + agencia_id + interessado (quando número não extraído)
-        let semantic_duplicate = false;
-        if (db && !is_duplicate) {
-          if (fields.numero_deliberacao && agencia_id_detected) {
-            const { data: existingDelib } = await db
-              .from("deliberacoes")
-              .select("id")
-              .eq("numero_deliberacao", fields.numero_deliberacao)
-              .eq("agencia_id", agencia_id_detected)
-              .maybeSingle();
-            if (existingDelib) semantic_duplicate = true;
-          }
+        // ── Chunking: divide em deliberações individuais se o PDF contiver múltiplas ──
+        const chunks = splitIntoDeliberacoes(extraction.text);
+        const isMultiChunk = chunks.length > 1;
 
-          if (!semantic_duplicate && fields.data_reuniao && agencia_id_detected && fields.interessado) {
-            const { data: existingByDate } = await db
-              .from("deliberacoes")
-              .select("id")
-              .eq("data_reuniao", fields.data_reuniao)
-              .eq("agencia_id", agencia_id_detected)
-              .eq("interessado", fields.interessado)
-              .maybeSingle();
-            if (existingByDate) semantic_duplicate = true;
-          }
-        }
+        // Processa cada chunk em paralelo
+        const chunkResults = await Promise.all(
+          chunks.map(async (chunk, chunkIdx): Promise<PreviewResult> => {
+            // NLP por regex
+            let fields = extractFields(chunk);
+            let confidence = calcConfidence(fields);
 
-        return {
-          filename: file.name,
-          status: confidence >= 0.5 ? "ok" : "low_confidence",
-          fields: {
-            numero_deliberacao: fields.numero_deliberacao,
-            reuniao_ordinaria: fields.reuniao_ordinaria,
-            data_reuniao: fields.data_reuniao,
-            interessado: fields.interessado,
-            assunto: fields.assunto,
-            processo: fields.processo,
-            resultado: fields.resultado,
-            microtema,
-            pauta_interna,
-            resumo_pleito: fields.resumo_pleito,
-            fundamento_decisao: fields.fundamento_decisao,
-            nomes_votacao: fields.nomes_votacao,
-            nomes_votacao_contra: fields.nomes_votacao_contra,
-          },
-          confidence,
-          page_count: extraction.pageCount,
-          chars_per_page: extraction.charsPerPage,
-          file_hash,
-          is_duplicate: is_duplicate || semantic_duplicate,
-          duplicate_job_id,
-          agencia_id_detected,
-          agencia_sigla_detected,
-          extraction_raw: {
-            numero_deliberacao: fields.numero_deliberacao,
-            reuniao_ordinaria: fields.reuniao_ordinaria,
-            numero_reuniao: fields.numero_reuniao,
-            data_reuniao: fields.data_reuniao,
-            interessado: fields.interessado,
-            processo: fields.processo,
-            assunto: fields.assunto,
-            resultado: fields.resultado,
-            microtema,
-            pauta_interna,
-            resumo_pleito: fields.resumo_pleito,
-            fundamento_decisao: fields.fundamento_decisao,
-            nomes_votacao: fields.nomes_votacao,
-            nomes_votacao_favor: fields.nomes_votacao_favor,
-            nomes_votacao_contra: fields.nomes_votacao_contra,
-            signatarios: fields.signatarios,
-            unanimidade_detectada: fields.unanimidade_detectada,
-            confidence,
-            page_count: extraction.pageCount,
-            chars_per_page: extraction.charsPerPage,
-            agencia_sigla_detected,
-            semantic_duplicate,
-          },
-        };
+            // LLM fallback: enriquece campos ausentes quando confiança baixa
+            if (confidence < LLM_CONFIDENCE_THRESHOLD) {
+              try {
+                const llmFields = await extractFieldsWithLLM(chunk);
+                fields = mergeWithLLMFields(fields, llmFields);
+                confidence = calcConfidence(fields);
+              } catch {
+                // Silently ignore
+              }
+            }
+
+            const { microtema } = classifyMicrotema(chunk);
+            const pauta_interna = fields.pauta_interna || classifyPautaInterna(chunk);
+
+            // Nome do arquivo com indicador de chunk para PDFs multi-deliberação
+            const chunkFilename = isMultiChunk
+              ? `${file.name} [${chunkIdx + 1}/${chunks.length}]`
+              : file.name;
+
+            // Verificação de duplicata semântica (produção apenas, apenas primeiro chunk)
+            let semantic_duplicate = false;
+            if (db && !is_duplicate) {
+              if (fields.numero_deliberacao && agencia_id_detected) {
+                const { data: existingDelib } = await db
+                  .from("deliberacoes")
+                  .select("id")
+                  .eq("numero_deliberacao", fields.numero_deliberacao)
+                  .eq("agencia_id", agencia_id_detected)
+                  .maybeSingle();
+                if (existingDelib) semantic_duplicate = true;
+              }
+
+              if (!semantic_duplicate && fields.data_reuniao && agencia_id_detected && fields.interessado) {
+                const { data: existingByDate } = await db
+                  .from("deliberacoes")
+                  .select("id")
+                  .eq("data_reuniao", fields.data_reuniao)
+                  .eq("agencia_id", agencia_id_detected)
+                  .eq("interessado", fields.interessado)
+                  .maybeSingle();
+                if (existingByDate) semantic_duplicate = true;
+              }
+            }
+
+            return {
+              filename: chunkFilename,
+              status: confidence >= 0.5 ? "ok" : "low_confidence",
+              fields: {
+                numero_deliberacao: fields.numero_deliberacao,
+                reuniao_ordinaria: fields.reuniao_ordinaria,
+                data_reuniao: fields.data_reuniao,
+                interessado: fields.interessado,
+                assunto: fields.assunto,
+                processo: fields.processo,
+                resultado: fields.resultado,
+                microtema,
+                pauta_interna,
+                resumo_pleito: fields.resumo_pleito,
+                fundamento_decisao: fields.fundamento_decisao,
+                nomes_votacao: fields.nomes_votacao,
+                nomes_votacao_contra: fields.nomes_votacao_contra,
+              },
+              confidence,
+              page_count: extraction.pageCount,
+              chars_per_page: extraction.charsPerPage,
+              file_hash: isMultiChunk ? `${file_hash}-${chunkIdx}` : file_hash,
+              is_duplicate: chunkIdx === 0 ? (is_duplicate || semantic_duplicate) : semantic_duplicate,
+              duplicate_job_id: chunkIdx === 0 ? duplicate_job_id : null,
+              agencia_id_detected,
+              agencia_sigla_detected,
+              extraction_raw: {
+                numero_deliberacao: fields.numero_deliberacao,
+                reuniao_ordinaria: fields.reuniao_ordinaria,
+                numero_reuniao: fields.numero_reuniao,
+                data_reuniao: fields.data_reuniao,
+                interessado: fields.interessado,
+                processo: fields.processo,
+                assunto: fields.assunto,
+                resultado: fields.resultado,
+                microtema,
+                pauta_interna,
+                resumo_pleito: fields.resumo_pleito,
+                fundamento_decisao: fields.fundamento_decisao,
+                nomes_votacao: fields.nomes_votacao,
+                nomes_votacao_favor: fields.nomes_votacao_favor,
+                nomes_votacao_contra: fields.nomes_votacao_contra,
+                signatarios: fields.signatarios,
+                unanimidade_detectada: fields.unanimidade_detectada,
+                confidence,
+                page_count: extraction.pageCount,
+                chars_per_page: extraction.charsPerPage,
+                agencia_sigla_detected,
+                semantic_duplicate,
+                llm_enriched: confidence >= LLM_CONFIDENCE_THRESHOLD,
+              },
+            };
+          })
+        );
+
+        return chunkResults;
       })
     );
+
+    // Flatten: [[r1, r2], [r3]] → [r1, r2, r3]
+    const results: PreviewResult[] = resultArrays.flat();
 
     const response: BatchPreviewResponse = { results };
     return NextResponse.json(response);
