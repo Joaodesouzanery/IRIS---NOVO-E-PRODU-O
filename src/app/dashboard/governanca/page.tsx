@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { DashboardOverview, MandatosAnalytics, Agencia, Deliberacao, DeliberacaoPaginada } from "@/types";
 import { IrisAreaChart } from "@/components/charts/IrisAreaChart";
+import { IrisTreemap } from "@/components/charts/IrisTreemap";
 import { ChartWrapper } from "@/components/charts/ChartWrapper";
 import { IrisBarChart } from "@/components/charts/IrisBarChart";
 import { formatNumber, cn } from "@/lib/utils";
@@ -258,17 +259,19 @@ export default function GovernancaPage() {
             </div>
           </div>
           {concentracao.top10.length > 0 && (
-            <div className="space-y-1.5">
-              <p className="text-xs text-text-muted font-mono uppercase tracking-wider mb-2">Top empresas por participação</p>
-              {concentracao.top10.slice(0, 5).map((e) => (
-                <div key={e.empresa} className="flex items-center gap-2">
-                  <span className="text-xs text-text-secondary truncate flex-1">{e.empresa}</span>
-                  <div className="w-20 h-1.5 rounded-full bg-bg-base border border-border overflow-hidden">
-                    <div className="h-full rounded-full bg-brand/60" style={{ width: `${Math.min(e.share_pct, 100)}%` }} />
-                  </div>
-                  <span className="text-xs font-mono text-text-muted w-10 text-right">{e.share_pct}%</span>
-                </div>
-              ))}
+            <div>
+              <p className="text-xs text-text-muted font-mono uppercase tracking-wider mb-3 border-l-2 border-brand/30 pl-2">
+                Participação por empresa
+              </p>
+              <IrisTreemap
+                data={concentracao.top10.map((e) => ({
+                  name: e.empresa.length > 30 ? e.empresa.slice(0, 28) + "…" : e.empresa,
+                  value: e.count,
+                }))}
+                total={concentracao.total}
+                height={200}
+                colorKey="brand"
+              />
             </div>
           )}
         </div>

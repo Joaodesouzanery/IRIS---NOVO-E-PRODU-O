@@ -7,17 +7,18 @@ import type { DiretorOverviewItem, Deliberacao, DeliberacaoPaginada, Agencia, Vo
 import { IrisBarChart } from "@/components/charts/IrisBarChart";
 import { IrisPieChart } from "@/components/charts/IrisPieChart";
 import { IrisHeatmap } from "@/components/charts/IrisHeatmap";
+import { IrisRadarChart } from "@/components/charts/IrisRadarChart";
+import type { RadarSeries } from "@/components/charts/IrisRadarChart";
 import { ChartWrapper } from "@/components/charts/ChartWrapper";
 import { getMicrotemaLabel, formatNumber, cn } from "@/lib/utils";
-import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { Users, Grid3x3, Handshake, BarChart3 } from "lucide-react";
 import { ModuleTabs } from "@/components/ui/ModuleTabs";
 import { DIRETORES_TABS } from "@/lib/module-tabs";
 
-const MICROTEMA_COLORS = [
-  "#f97316","#3b82f6","#22c55e","#8b5cf6","#ef4444",
-  "#06b6d4","#f59e0b","#10b981","#ec4899","#84cc16",
-  "#0ea5e9","#a78bfa","#fb7185",
+// Harmonized level-400 palette for multi-series charts
+const CHART_COLORS = [
+  "#f97316", "#60a5fa", "#34d399", "#a78bfa", "#f87171",
+  "#22d3ee", "#fbbf24", "#f472b6", "#818cf8", "#4ade80",
 ];
 
 function shortName(nome: string) {
@@ -159,12 +160,12 @@ export default function AnalyticsDiretoresPage() {
       metrics: radarRows,
       dirs: dirs.slice(0, 5).map((d, i) => ({
         key: shortName(d.diretor_nome),
-        color: MICROTEMA_COLORS[i % MICROTEMA_COLORS.length],
+        color: CHART_COLORS[i % CHART_COLORS.length],
       })),
     };
   }, [diretores, diversidadeData]);
 
-  const RADAR_COLORS = MICROTEMA_COLORS;
+  const RADAR_COLORS = CHART_COLORS;
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -241,7 +242,7 @@ export default function AnalyticsDiretoresPage() {
           if (loadDelibs) return <div className="h-48 flex items-center justify-center text-text-muted text-sm">Carregando...</div>;
           if (!diversidadeData.length) return <div className="h-48 flex items-center justify-center text-text-muted text-sm">Sem dados</div>;
           if (type === "bar") return <IrisBarChart data={diversidadeData} horizontal height={240} />;
-          return <IrisPieChart data={diversidadeData.map((d, i) => ({ ...d, color: MICROTEMA_COLORS[i % MICROTEMA_COLORS.length] }))} height={240} showLegend />;
+          return <IrisPieChart data={diversidadeData.map((d, i) => ({ ...d, color: CHART_COLORS[i % CHART_COLORS.length] }))} height={240} showLegend />;
         }}
       </ChartWrapper>
 
@@ -259,39 +260,15 @@ export default function AnalyticsDiretoresPage() {
         ) : radarData.dirs.length === 0 ? (
           <div className="h-72 flex items-center justify-center text-text-muted text-sm">Sem dados</div>
         ) : (
-          <ResponsiveContainer width="100%" height={300}>
-            <RadarChart data={radarData.metrics}>
-              <PolarGrid stroke="#2a2a2a" />
-              <PolarAngleAxis
-                dataKey="metric"
-                tick={{ fill: "#71717a", fontSize: 11, fontFamily: "JetBrains Mono" }}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "#1c1c1c",
-                  border: "1px solid #2a2a2a",
-                  borderRadius: 8,
-                  fontSize: 12,
-                }}
-                labelStyle={{ color: "#a1a1aa" }}
-                itemStyle={{ color: "#e4e4e7" }}
-              />
-              <Legend
-                wrapperStyle={{ fontSize: 11, fontFamily: "JetBrains Mono", color: "#71717a" }}
-              />
-              {radarData.dirs.map((d, i) => (
-                <Radar
-                  key={d.key}
-                  name={d.key}
-                  dataKey={d.key}
-                  stroke={d.color}
-                  fill={d.color}
-                  fillOpacity={0.08}
-                  strokeWidth={2}
-                />
-              ))}
-            </RadarChart>
-          </ResponsiveContainer>
+          <IrisRadarChart
+            data={radarData.metrics.map((m) => ({ ...m, subject: String(m.metric) }))}
+            series={radarData.dirs.map((d): RadarSeries => ({
+              key: d.key,
+              name: d.key,
+              color: d.color,
+            }))}
+            height={300}
+          />
         )}
       </div>
 

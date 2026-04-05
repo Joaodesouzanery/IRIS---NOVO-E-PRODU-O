@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type {
   DashboardOverview, MicrotemaStats, DiretorOverviewItem,
-  Deliberacao, DeliberacaoPaginada, Agencia, BoletimSchedule,
+  Deliberacao, DeliberacaoPaginada, Agencia, BoletimSchedule, EmpresaStats,
 } from "@/types";
 import { getMicrotemaLabel, formatNumber, cn } from "@/lib/utils";
 import {
@@ -42,6 +42,27 @@ const SECTIONS: Section[] = [
 
 // ── Newsletter HTML builder ────────────────────────────────────────────────
 
+// Shared inline styles (light theme — maximum email client compatibility)
+const S = {
+  body:    "margin:0;padding:0;background:#f0f0f0;font-family:Arial,Helvetica,sans-serif",
+  wrapper: "background:#f0f0f0;padding:24px 0",
+  card:    "background:#ffffff;border:1px solid #e4e4e7;border-radius:8px;padding:0",
+  section: "padding:20px 28px;border-bottom:1px solid #f4f4f5",
+  h2:      "margin:0 0 14px;font-size:11px;color:#f97316;font-family:Arial,Helvetica,sans-serif;text-transform:uppercase;letter-spacing:1.5px;font-weight:700",
+  label:   "margin:0;font-size:10px;color:#71717a;text-transform:uppercase;letter-spacing:0.5px",
+  value:   "margin:4px 0 0;font-size:22px;font-weight:700;color:#111111;font-family:Arial,Helvetica,sans-serif",
+  muted:   "color:#71717a",
+  text:    "font-size:12px;color:#374151",
+};
+
+function resultBadge(resultado: string | null) {
+  if (!resultado) return `<span style="font-size:11px;color:#71717a">—</span>`;
+  const isPos = resultado.toLowerCase().includes("deferido") && !resultado.toLowerCase().includes("inde");
+  const color = isPos ? "#16a34a" : resultado.toLowerCase().includes("indeferido") ? "#dc2626" : "#d97706";
+  const bg    = isPos ? "#f0fdf4" : resultado.toLowerCase().includes("indeferido") ? "#fef2f2" : "#fffbeb";
+  return `<span style="display:inline-block;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:600;color:${color};background:${bg};border:1px solid ${color}30">${resultado}</span>`;
+}
+
 function buildHtml(opts: {
   selectedSections: string[];
   periodo: string;
@@ -49,103 +70,203 @@ function buildHtml(opts: {
   microtemas: MicrotemaStats[] | undefined;
   diretores: DiretorOverviewItem[] | undefined;
   deliberacoes: Deliberacao[];
+  empresas: EmpresaStats[] | undefined;
   agencia: string;
 }) {
-  const { selectedSections: sel, periodo, overview, microtemas, diretores, deliberacoes, agencia } = opts;
+  const { selectedSections: sel, periodo, overview, microtemas, diretores, deliberacoes, empresas, agencia } = opts;
   const today = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
   const ag = agencia || "Todas as Agências";
 
   const sec = (id: string) => sel.includes(id);
 
+  // ── Section: KPIs ──────────────────────────────────────────────────────────
   const kpisHtml = sec("kpis") && overview ? `
-    <tr><td style="padding:16px 0">
-      <h2 style="margin:0 0 12px;font-size:14px;color:#f97316;font-family:monospace;text-transform:uppercase;letter-spacing:1px">KPIs Principais</h2>
-      <table width="100%" cellpadding="0" cellspacing="0"><tr>
-        <td style="background:#1c1c1c;border:1px solid #2a2a2a;border-radius:8px;padding:12px;text-align:center;width:25%">
-          <p style="margin:0;font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase">Total</p>
-          <p style="margin:4px 0 0;font-size:22px;font-weight:700;color:#f4f4f5;font-family:monospace">${formatNumber(overview.total_deliberacoes)}</p>
+    <tr><td style="${S.section}">
+      <p style="${S.h2}">KPIs Principais</p>
+      <table width="100%" cellpadding="0" cellspacing="4"><tr>
+        <td style="background:#f9fafb;border:1px solid #e4e4e7;border-radius:6px;padding:12px;text-align:center;width:25%">
+          <p style="${S.label}">Total</p>
+          <p style="${S.value}">${formatNumber(overview.total_deliberacoes)}</p>
         </td>
-        <td width="8"></td>
-        <td style="background:#1c1c1c;border:1px solid #2a2a2a;border-radius:8px;padding:12px;text-align:center;width:25%">
-          <p style="margin:0;font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase">Deferidos</p>
-          <p style="margin:4px 0 0;font-size:22px;font-weight:700;color:#22c55e;font-family:monospace">${formatNumber(overview.deferidos)}</p>
+        <td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:12px;text-align:center;width:25%">
+          <p style="${S.label}">Deferidos</p>
+          <p style="margin:4px 0 0;font-size:22px;font-weight:700;color:#16a34a;font-family:Arial,Helvetica,sans-serif">${formatNumber(overview.deferidos)}</p>
         </td>
-        <td width="8"></td>
-        <td style="background:#1c1c1c;border:1px solid #2a2a2a;border-radius:8px;padding:12px;text-align:center;width:25%">
-          <p style="margin:0;font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase">Taxa Def.</p>
-          <p style="margin:4px 0 0;font-size:22px;font-weight:700;color:#f97316;font-family:monospace">${overview.taxa_deferimento}%</p>
+        <td style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:12px;text-align:center;width:25%">
+          <p style="${S.label}">Taxa Def.</p>
+          <p style="margin:4px 0 0;font-size:22px;font-weight:700;color:#f97316;font-family:Arial,Helvetica,sans-serif">${overview.taxa_deferimento}%</p>
         </td>
-        <td width="8"></td>
-        <td style="background:#1c1c1c;border:1px solid #2a2a2a;border-radius:8px;padding:12px;text-align:center;width:25%">
-          <p style="margin:0;font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase">Reuniões</p>
-          <p style="margin:4px 0 0;font-size:22px;font-weight:700;color:#f4f4f5;font-family:monospace">${formatNumber(overview.reunioes_unicas)}</p>
+        <td style="background:#f9fafb;border:1px solid #e4e4e7;border-radius:6px;padding:12px;text-align:center;width:25%">
+          <p style="${S.label}">Reuniões</p>
+          <p style="${S.value}">${formatNumber(overview.reunioes_unicas)}</p>
         </td>
       </tr></table>
     </td></tr>` : "";
 
+  // ── Section: Deliberações Recentes ────────────────────────────────────────
   const recentesHtml = sec("recentes") && deliberacoes.length ? `
-    <tr><td style="padding:16px 0;border-top:1px solid #2a2a2a">
-      <h2 style="margin:0 0 12px;font-size:14px;color:#f97316;font-family:monospace;text-transform:uppercase;letter-spacing:1px">Deliberações Recentes</h2>
+    <tr><td style="${S.section}">
+      <p style="${S.h2}">Deliberações Recentes</p>
       <table width="100%" cellpadding="0" cellspacing="0">
-        ${deliberacoes.slice(0, 5).map((d) => `
-        <tr><td style="padding:8px 0;border-bottom:1px solid #2a2a2a">
-          <p style="margin:0;font-size:13px;color:#f4f4f5;font-weight:600">${d.numero_deliberacao ?? "—"} — ${d.interessado ?? "Sem interessado"}</p>
-          <p style="margin:2px 0 0;font-size:12px;color:#71717a">${d.assunto ?? d.microtema ?? ""} · ${d.resultado ?? "Sem resultado"}</p>
-        </td></tr>`).join("")}
+        ${deliberacoes.slice(0, 5).map((d) => {
+          const assunto = (d as any).assunto ?? (d as any).resumo_pleito ?? d.microtema ?? "";
+          return `
+        <tr><td style="padding:10px 0;border-bottom:1px solid #f4f4f5">
+          <table width="100%" cellpadding="0" cellspacing="0"><tr>
+            <td>
+              <p style="margin:0;font-size:13px;color:#111111;font-weight:600">${d.numero_deliberacao ?? "—"} &mdash; ${d.interessado ?? "Sem interessado"}</p>
+              <p style="margin:3px 0 0;font-size:12px;color:#6b7280">${assunto}</p>
+            </td>
+            <td align="right" style="vertical-align:top;padding-left:12px;white-space:nowrap">
+              ${resultBadge(d.resultado ?? null)}
+            </td>
+          </tr></table>
+        </td></tr>`;
+        }).join("")}
       </table>
     </td></tr>` : "";
 
+  // ── Section: Setores Mais Afetados ────────────────────────────────────────
   const setoresHtml = sec("setores") && microtemas?.length ? `
-    <tr><td style="padding:16px 0;border-top:1px solid #2a2a2a">
-      <h2 style="margin:0 0 12px;font-size:14px;color:#f97316;font-family:monospace;text-transform:uppercase;letter-spacing:1px">Setores Mais Afetados</h2>
-      ${[...(microtemas ?? [])].sort((a,b) => b.total - a.total).slice(0,5).map((m, i) => `
-      <div style="margin-bottom:8px">
-        <p style="margin:0 0 3px;font-size:12px;color:#a1a1aa">${i+1}. ${getMicrotemaLabel(m.microtema)} — <span style="color:#f4f4f5">${formatNumber(m.total)}</span></p>
-      </div>`).join("")}
+    <tr><td style="${S.section}">
+      <p style="${S.h2}">Setores Mais Afetados</p>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <th style="text-align:left;font-size:10px;color:#9ca3af;font-weight:600;padding-bottom:8px;border-bottom:1px solid #f4f4f5">Microtema</th>
+          <th style="text-align:right;font-size:10px;color:#9ca3af;font-weight:600;padding-bottom:8px;border-bottom:1px solid #f4f4f5">Total</th>
+          <th style="text-align:right;font-size:10px;color:#9ca3af;font-weight:600;padding-bottom:8px;border-bottom:1px solid #f4f4f5">% Deferido</th>
+        </tr>
+        ${[...(microtemas ?? [])].sort((a,b) => b.total - a.total).slice(0, 6).map((m) => `
+        <tr>
+          <td style="padding:7px 0;font-size:12px;color:#374151;border-bottom:1px solid #f9fafb">${getMicrotemaLabel(m.microtema)}</td>
+          <td style="padding:7px 0;font-size:12px;color:#111111;font-weight:700;text-align:right;border-bottom:1px solid #f9fafb">${formatNumber(m.total)}</td>
+          <td style="padding:7px 0;font-size:12px;color:#16a34a;font-weight:600;text-align:right;border-bottom:1px solid #f9fafb">${m.pct_deferido.toFixed(0)}%</td>
+        </tr>`).join("")}
+      </table>
     </td></tr>` : "";
 
+  // ── Section: Diretores em Destaque ────────────────────────────────────────
   const diretoresHtml = sec("diretores") && diretores?.length ? `
-    <tr><td style="padding:16px 0;border-top:1px solid #2a2a2a">
-      <h2 style="margin:0 0 12px;font-size:14px;color:#f97316;font-family:monospace;text-transform:uppercase;letter-spacing:1px">Diretores em Destaque</h2>
-      ${diretores.slice(0,5).map((d) => `
-      <div style="margin-bottom:6px">
-        <p style="margin:0;font-size:12px;color:#a1a1aa">${d.diretor_nome} — <span style="color:#f4f4f5">${formatNumber(d.total)}</span> votos · <span style="color:#22c55e">${d.pct_favor.toFixed(0)}%</span> favoráveis</p>
-      </div>`).join("")}
+    <tr><td style="${S.section}">
+      <p style="${S.h2}">Diretores em Destaque</p>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <th style="text-align:left;font-size:10px;color:#9ca3af;font-weight:600;padding-bottom:8px;border-bottom:1px solid #f4f4f5">Diretor(a)</th>
+          <th style="text-align:right;font-size:10px;color:#9ca3af;font-weight:600;padding-bottom:8px;border-bottom:1px solid #f4f4f5">Votos</th>
+          <th style="text-align:right;font-size:10px;color:#9ca3af;font-weight:600;padding-bottom:8px;border-bottom:1px solid #f4f4f5">% Favorável</th>
+        </tr>
+        ${diretores.slice(0, 5).map((d) => `
+        <tr>
+          <td style="padding:7px 0;font-size:12px;color:#374151;border-bottom:1px solid #f9fafb">${d.diretor_nome}</td>
+          <td style="padding:7px 0;font-size:12px;color:#111111;font-weight:700;text-align:right;border-bottom:1px solid #f9fafb">${formatNumber(d.total)}</td>
+          <td style="padding:7px 0;font-size:12px;color:#16a34a;font-weight:600;text-align:right;border-bottom:1px solid #f9fafb">${d.pct_favor.toFixed(0)}%</td>
+        </tr>`).join("")}
+      </table>
+    </td></tr>` : "";
+
+  // ── Section: Empresas Reguladas ───────────────────────────────────────────
+  const empresasHtml = sec("empresas") && empresas?.length ? `
+    <tr><td style="${S.section}">
+      <p style="${S.h2}">Empresas Reguladas — Top 5</p>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <th style="text-align:left;font-size:10px;color:#9ca3af;font-weight:600;padding-bottom:8px;border-bottom:1px solid #f4f4f5">Empresa</th>
+          <th style="text-align:right;font-size:10px;color:#9ca3af;font-weight:600;padding-bottom:8px;border-bottom:1px solid #f4f4f5">Deliberações</th>
+          <th style="text-align:right;font-size:10px;color:#9ca3af;font-weight:600;padding-bottom:8px;border-bottom:1px solid #f4f4f5">% Deferido</th>
+        </tr>
+        ${[...empresas].sort((a,b) => b.total_deliberacoes - a.total_deliberacoes).slice(0, 5).map((e) => `
+        <tr>
+          <td style="padding:7px 0;font-size:12px;color:#374151;border-bottom:1px solid #f9fafb">${e.nome.length > 40 ? e.nome.slice(0, 38) + "…" : e.nome}</td>
+          <td style="padding:7px 0;font-size:12px;color:#111111;font-weight:700;text-align:right;border-bottom:1px solid #f9fafb">${formatNumber(e.total_deliberacoes)}</td>
+          <td style="padding:7px 0;font-size:12px;color:#16a34a;font-weight:600;text-align:right;border-bottom:1px solid #f9fafb">${e.pct_deferido.toFixed(0)}%</td>
+        </tr>`).join("")}
+      </table>
+    </td></tr>` : "";
+
+  // ── Section: Análise de Consenso ──────────────────────────────────────────
+  const consensoHtml = sec("consenso") && diretores?.length ? (() => {
+    const avgFavor = diretores.reduce((s, d) => s + d.pct_favor, 0) / Math.max(1, diretores.length);
+    const totalVotos = diretores.reduce((s, d) => s + d.total, 0);
+    const divCount = diretores.filter((d) => d.divergente > 0).length;
+    return `
+    <tr><td style="${S.section}">
+      <p style="${S.h2}">Análise de Consenso</p>
+      <table width="100%" cellpadding="0" cellspacing="4"><tr>
+        <td style="background:#f9fafb;border:1px solid #e4e4e7;border-radius:6px;padding:12px;text-align:center;width:33%">
+          <p style="${S.label}">Média Favorável</p>
+          <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:#16a34a;font-family:Arial,Helvetica,sans-serif">${avgFavor.toFixed(1)}%</p>
+        </td>
+        <td style="background:#f9fafb;border:1px solid #e4e4e7;border-radius:6px;padding:12px;text-align:center;width:33%">
+          <p style="${S.label}">Total Votos</p>
+          <p style="${S.value}">${formatNumber(totalVotos)}</p>
+        </td>
+        <td style="background:#f9fafb;border:1px solid #e4e4e7;border-radius:6px;padding:12px;text-align:center;width:33%">
+          <p style="${S.label}">Com divergência</p>
+          <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:${divCount > 0 ? "#d97706" : "#16a34a"};font-family:Arial,Helvetica,sans-serif">${divCount} dir.</p>
+        </td>
+      </tr></table>
+    </td></tr>`;
+  })() : "";
+
+  // ── Section: Taxa de Governança ───────────────────────────────────────────
+  const governancaHtml = sec("governanca") && overview ? `
+    <tr><td style="${S.section}">
+      <p style="${S.h2}">Taxa de Governança</p>
+      <table width="100%" cellpadding="0" cellspacing="4"><tr>
+        <td style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:12px;text-align:center;width:50%">
+          <p style="${S.label}">Taxa de Deferimento</p>
+          <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:#f97316;font-family:Arial,Helvetica,sans-serif">${overview.taxa_deferimento}%</p>
+        </td>
+        <td style="background:#f9fafb;border:1px solid #e4e4e7;border-radius:6px;padding:12px;text-align:center;width:50%">
+          <p style="${S.label}">Confiança IA</p>
+          <p style="${S.value}">${overview.avg_confidence ? (overview.avg_confidence * 100).toFixed(0) + "%" : "—"}</p>
+        </td>
+      </tr></table>
     </td></tr>` : "";
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Boletim IRIS Regulação</title></head>
-<body style="margin:0;padding:0;background:#0d0d0d;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#0d0d0d;padding:24px 0">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Boletim IRIS Regulação</title>
+</head>
+<body style="${S.body}">
+<table width="100%" cellpadding="0" cellspacing="0" style="${S.wrapper}">
 <tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="background:#141414;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden">
+<table width="600" cellpadding="0" cellspacing="0" style="${S.card}">
 
   <!-- Header -->
-  <tr><td style="background:#f97316;padding:20px 28px">
+  <tr><td style="background:#f97316;padding:22px 28px;border-radius:8px 8px 0 0">
     <table width="100%" cellpadding="0" cellspacing="0"><tr>
-      <td><p style="margin:0;font-size:20px;font-weight:700;color:#fff">IRIS Regulação</p>
-          <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.8)">Boletim Regulatório · ${ag}</p></td>
-      <td align="right"><p style="margin:0;font-size:11px;color:rgba(255,255,255,0.7);font-family:monospace">${today}</p>
-          <p style="margin:2px 0 0;font-size:11px;color:rgba(255,255,255,0.7);font-family:monospace">${PERIODOS.find(p => p.value === periodo)?.label ?? periodo}</p></td>
+      <td>
+        <p style="margin:0;font-size:20px;font-weight:700;color:#ffffff;font-family:Arial,Helvetica,sans-serif">IRIS Regulação</p>
+        <p style="margin:4px 0 0;font-size:12px;color:rgba(255,255,255,0.85);font-family:Arial,Helvetica,sans-serif">Boletim Regulatório · ${ag}</p>
+      </td>
+      <td align="right">
+        <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.8);font-family:Arial,Helvetica,sans-serif">${today}</p>
+        <p style="margin:3px 0 0;font-size:11px;color:rgba(255,255,255,0.8);font-family:Arial,Helvetica,sans-serif">${PERIODOS.find(p => p.value === periodo)?.label ?? periodo}</p>
+      </td>
     </tr></table>
   </td></tr>
 
-  <!-- Content -->
-  <tr><td style="padding:0 28px">
+  <!-- Sections -->
+  <tr><td>
     <table width="100%" cellpadding="0" cellspacing="0">
       ${kpisHtml}
       ${recentesHtml}
       ${setoresHtml}
       ${diretoresHtml}
+      ${empresasHtml}
+      ${consensoHtml}
+      ${governancaHtml}
     </table>
   </td></tr>
 
   <!-- Footer -->
-  <tr><td style="padding:16px 28px;border-top:1px solid #2a2a2a;background:#0d0d0d">
-    <p style="margin:0;font-size:11px;color:#52525b;font-family:monospace;text-align:center">
-      Gerado automaticamente pelo IRIS Regulação · ${today}
+  <tr><td style="padding:16px 28px;background:#f9fafb;border-top:1px solid #e4e4e7;border-radius:0 0 8px 8px">
+    <p style="margin:0;font-size:11px;color:#9ca3af;text-align:center;font-family:Arial,Helvetica,sans-serif">
+      Gerado automaticamente pelo IRIS Regulação &middot; ${today}
     </p>
   </td></tr>
 
@@ -199,6 +320,11 @@ export default function BoletimPage() {
   });
   const deliberacoes: Deliberacao[] = deliberacoesPag?.data ?? [];
 
+  const { data: empresas } = useQuery({
+    queryKey: ["empresas", agenciaId],
+    queryFn: () => api.get<EmpresaStats[]>(`/empresas${agenciaId ? `?agencia_id=${agenciaId}` : ""}`),
+  });
+
   const { data: schedulesData, isLoading: loadSchedules } = useQuery({
     queryKey: ["boletim", "schedules"],
     queryFn: () => api.get<{ schedules: BoletimSchedule[] }>("/boletim/schedule"),
@@ -224,7 +350,7 @@ export default function BoletimPage() {
   // ── Derived HTML ──────────────────────────────────────────────────────────
 
   const html = buildHtml({
-    selectedSections, periodo, overview, microtemas, diretores, deliberacoes,
+    selectedSections, periodo, overview, microtemas, diretores, deliberacoes, empresas,
     agencia: (agencias ?? []).find((a) => a.id === agenciaId)?.sigla ?? "",
   });
 
