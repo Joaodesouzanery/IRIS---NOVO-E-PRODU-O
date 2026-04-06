@@ -17,6 +17,7 @@ const MAX_FILES_PER_BATCH = 1000;
 // Agências conhecidas em modo demo — sem DB
 const DEMO_AGENCIES = [
   { id: "demo-agency-artesp", sigla: "ARTESP" },
+  { id: "demo-agency-anm",    sigla: "ANM"    },
   { id: "demo-agency-aneel",  sigla: "ANEEL"  },
   { id: "demo-agency-anvisa", sigla: "ANVISA" },
 ];
@@ -54,6 +55,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const { isPdfBuffer, extractPdfText, sha256Hex } = await import("@/lib/server/pdf-extractor");
     const { extractFields, calcConfidence } = await import("@/lib/server/nlp-extractor");
     const { classifyMicrotema, classifyPautaInterna, detectAgenciaSigla } = await import("@/lib/server/classifier");
+    const { detectDocumentType, splitAtaItems, extractAtaMetadata } = await import("@/lib/server/ata-splitter");
 
     // Carrega agências uma vez por request
     let allAgencias: { id: string; sigla: string }[];
@@ -130,17 +132,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           };
         }
 
+        // Detectar tipo de documento
+        const tipo_documento = detectDocumentType(extraction.text);
+
         // NLP
         const fields = extractFields(extraction.text);
         const { microtema } = classifyMicrotema(extraction.text);
         const confidence = calcConfidence(fields);
-        const pauta_interna = fields.pauta_interna || classifyPautaInterna(extraction.text);
 
-        // Detecção de agência
+        // Detecção de agência (antes de pauta_interna, pois precisa da sigla)
         const agencia_sigla_detected = detectAgenciaSigla(extraction.text, siglas);
         const agencia_id_detected = agencia_sigla_detected
           ? (allAgencias.find((a) => a.sigla === agencia_sigla_detected)?.id ?? null)
           : null;
+
+        const pauta_interna = fields.pauta_interna || classifyPautaInterna(
+          extraction.text, fields.interessado, agencia_sigla_detected
+        );
 
         // Verificação de duplicata semântica (produção apenas)
         // 1. Por numero_deliberacao (principal)
@@ -169,17 +177,50 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           }
         }
 
+        // Se for ata, extrair items individuais para preview
+        let ata_items: Array<{
+          item_numero: string; processo: string | null; assunto: string | null;
+          interessado: string | null; relator: string | null;
+          decisao: string | null; resultado: string | null; microtema: string;
+        }> | undefined;
+
+        if (tipo_documento === "ata") {
+          const rawItems = splitAtaItems(extraction.text);
+          const ataMeta = extractAtaMetadata(extraction.text);
+          ata_items = rawItems.map((item) => ({
+            item_numero: item.item_numero,
+            processo: item.processo,
+            assunto: item.assunto,
+            interessado: item.interessado,
+            relator: item.relator,
+            decisao: item.decisao?.slice(0, 500) ?? null,
+            resultado: item.resultado,
+            microtema: classifyMicrotema(item.raw_text, agencia_sigla_detected).microtema,
+          }));
+          // Sobrescrever data se o campo estava vazio (deliberação não detectou, mas ata sim)
+          if (!fields.data_reuniao && ataMeta.data_reuniao) {
+            fields.data_reuniao = ataMeta.data_reuniao;
+          }
+        }
+
         return {
           filename: file.name,
           status: confidence >= 0.5 ? "ok" : "low_confidence",
           fields: {
             numero_deliberacao: fields.numero_deliberacao,
+            numero_reuniao: fields.numero_reuniao,
             reuniao_ordinaria: fields.reuniao_ordinaria,
+            tipo_reuniao: fields.tipo_reuniao,
+            tipo_documento,
             data_reuniao: fields.data_reuniao,
             interessado: fields.interessado,
             assunto: fields.assunto,
+            procedencia: fields.procedencia,
+            relator: null, // deliberações individuais não têm relator global
+            item_numero: null,
             processo: fields.processo,
             resultado: fields.resultado,
+            decisoes_todas: fields.decisoes_todas,
             microtema,
             pauta_interna,
             resumo_pleito: fields.resumo_pleito,
@@ -195,15 +236,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           duplicate_job_id,
           agencia_id_detected,
           agencia_sigla_detected,
+          ...(ata_items ? { ata_items } : {}),
           extraction_raw: {
             numero_deliberacao: fields.numero_deliberacao,
             reuniao_ordinaria: fields.reuniao_ordinaria,
             numero_reuniao: fields.numero_reuniao,
+            tipo_reuniao: fields.tipo_reuniao,
             data_reuniao: fields.data_reuniao,
             interessado: fields.interessado,
+            procedencia: fields.procedencia,
             processo: fields.processo,
             assunto: fields.assunto,
             resultado: fields.resultado,
+            decisoes_todas: fields.decisoes_todas,
             microtema,
             pauta_interna,
             resumo_pleito: fields.resumo_pleito,
@@ -240,12 +285,19 @@ function errorResult(
     status: "error",
     fields: {
       numero_deliberacao: null,
+      numero_reuniao: null,
       reuniao_ordinaria: null,
+      tipo_reuniao: null,
+      tipo_documento: "deliberacao" as const,
       data_reuniao: null,
       interessado: null,
       assunto: null,
+      procedencia: null,
+      relator: null,
+      item_numero: null,
       processo: null,
       resultado: null,
+      decisoes_todas: [],
       microtema: "outros",
       pauta_interna: false,
       resumo_pleito: null,

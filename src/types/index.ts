@@ -1,9 +1,17 @@
 // Tipos principais da plataforma IRIS Regulação
 
 export type Microtema =
+  // ARTESP
   | "tarifa" | "obras" | "multa" | "contrato" | "reequilibrio"
   | "fiscalizacao" | "seguranca" | "ambiental" | "desapropriacao"
-  | "adimplencia" | "pessoal" | "usuario" | "outros";
+  | "adimplencia" | "pessoal" | "usuario"
+  // ANM (mineração)
+  | "lavra" | "pesquisa" | "licenciamento" | "servidao" | "cfem"
+  | "disponibilidade" | "recursos"
+  // Genérico
+  | "outros";
+
+export type TipoDocumento = "deliberacao" | "ata" | "resolucao" | "portaria";
 
 export type Resultado =
   | "Deferido"
@@ -61,12 +69,20 @@ export interface VotoEmbutido {
 export interface Deliberacao {
   id: string;
   numero_deliberacao: string | null;
+  numero_reuniao: string | null;
   reuniao_ordinaria: string | null;
+  tipo_reuniao: "Ordinaria" | "Extraordinaria" | null;
+  tipo_documento: TipoDocumento;
   processo: string | null;
   interessado: string | null;
   assunto?: string | null;
+  procedencia: string | null;
+  relator: string | null;
+  item_numero: string | null;
+  documento_pai_id: string | null;
   microtema: string | null;
   resultado: Resultado | null;
+  decisoes_todas: string[] | null;
   pauta_interna: boolean;
   data_reuniao: string | null;
   agencia_id: string | null;
@@ -308,18 +324,41 @@ export interface Alerta {
 
 export interface PreviewResultFields {
   numero_deliberacao: string | null;
+  numero_reuniao: string | null;
   reuniao_ordinaria: string | null;
+  tipo_reuniao: string | null;
+  tipo_documento: TipoDocumento;
   data_reuniao: string | null;
   interessado: string | null;
   assunto: string | null;
+  procedencia: string | null;
+  relator: string | null;
+  item_numero: string | null;
   processo: string | null;
   resultado: string | null;
+  decisoes_todas: string[];
   microtema: string;
   pauta_interna: boolean;
   resumo_pleito: string | null;
   fundamento_decisao: string | null;
   nomes_votacao: string[];
   nomes_votacao_contra: string[];
+}
+
+/** Para atas: uma PreviewResult pode conter múltiplos items */
+export interface AtaPreviewItem {
+  item_numero: string;
+  processo: string | null;
+  assunto: string | null;
+  interessado: string | null;
+  relator: string | null;
+  decisao: string | null;
+  resultado: string | null;
+  microtema: string;
+}
+
+export interface PreviewResultAta extends PreviewResult {
+  ata_items: AtaPreviewItem[];
 }
 
 export interface PreviewResult {
@@ -336,6 +375,7 @@ export interface PreviewResult {
   agencia_id_detected: string | null;
   agencia_sigla_detected: string | null;
   extraction_raw?: Record<string, unknown>;
+  ata_items?: AtaPreviewItem[];
 }
 
 export interface BatchPreviewResponse {
@@ -345,12 +385,19 @@ export interface BatchPreviewResponse {
 export interface ConfirmDelib {
   filename: string;
   numero_deliberacao: string | null;
+  numero_reuniao: string | null;
   reuniao_ordinaria: string | null;
+  tipo_reuniao: string | null;
+  tipo_documento: TipoDocumento;
   data_reuniao: string | null;
   interessado: string | null;
   assunto: string | null;
+  procedencia: string | null;
+  relator: string | null;
+  item_numero: string | null;
   processo: string | null;
   resultado: string | null;
+  decisoes_todas: string[];
   microtema: string | null;
   pauta_interna: boolean;
   resumo_pleito: string | null;
@@ -359,6 +406,7 @@ export interface ConfirmDelib {
   nomes_votacao_contra: string[];
   extraction_confidence: number;
   extraction_raw?: Record<string, unknown>;
+  ata_items?: AtaPreviewItem[];
 }
 
 export interface ConfirmResult {

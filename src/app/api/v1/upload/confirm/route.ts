@@ -23,26 +23,45 @@ const RESULTADOS_VALIDOS = new Set<string>([
 ]);
 
 const MICROTEMAS_VALIDOS = new Set<string>([
+  // ARTESP
   "tarifa", "obras", "multa", "contrato", "reequilibrio",
   "fiscalizacao", "seguranca", "ambiental", "desapropriacao",
-  "adimplencia", "pessoal", "usuario", "outros",
+  "adimplencia", "pessoal", "usuario",
+  // ANM (mineração)
+  "lavra", "pesquisa", "licenciamento", "servidao", "cfem",
+  "disponibilidade", "recursos",
+  // Genérico
+  "outros",
 ]);
 
 const RE_ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 
+const TIPOS_REUNIAO_VALIDOS = new Set(["Ordinaria", "Extraordinaria"]);
+const TIPOS_DOCUMENTO_VALIDOS = new Set(["deliberacao", "ata", "resolucao", "portaria"]);
+
 function sanitizeDelib(d: ConfirmDelib): ConfirmDelib {
   return {
     filename: String(d.filename ?? "").slice(0, 255),
     numero_deliberacao: d.numero_deliberacao ? String(d.numero_deliberacao).slice(0, 50) : null,
+    numero_reuniao: d.numero_reuniao ? String(d.numero_reuniao).slice(0, 10) : null,
     reuniao_ordinaria: d.reuniao_ordinaria ? String(d.reuniao_ordinaria).slice(0, 100) : null,
+    tipo_reuniao: d.tipo_reuniao && TIPOS_REUNIAO_VALIDOS.has(d.tipo_reuniao) ? d.tipo_reuniao : null,
+    tipo_documento: d.tipo_documento && TIPOS_DOCUMENTO_VALIDOS.has(d.tipo_documento)
+      ? d.tipo_documento : "deliberacao",
     data_reuniao: d.data_reuniao && RE_ISO_DATE.test(d.data_reuniao) ? d.data_reuniao : null,
     interessado: d.interessado ? String(d.interessado).slice(0, 255) : null,
     assunto: d.assunto ? String(d.assunto).slice(0, 500) : null,
+    procedencia: d.procedencia ? String(d.procedencia).slice(0, 200) : null,
+    relator: d.relator ? String(d.relator).slice(0, 200) : null,
+    item_numero: d.item_numero ? String(d.item_numero).slice(0, 20) : null,
     processo: d.processo ? String(d.processo).slice(0, 100) : null,
     resultado: d.resultado && RESULTADOS_VALIDOS.has(d.resultado)
       ? (d.resultado as Resultado)
       : null,
+    decisoes_todas: Array.isArray(d.decisoes_todas)
+      ? d.decisoes_todas.filter((v) => RESULTADOS_VALIDOS.has(v)).slice(0, 10)
+      : [],
     microtema: d.microtema && MICROTEMAS_VALIDOS.has(d.microtema) ? d.microtema : "outros",
     pauta_interna: Boolean(d.pauta_interna),
     resumo_pleito: d.resumo_pleito ? String(d.resumo_pleito).slice(0, 2000) : null,
@@ -104,20 +123,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const createdDelibs: Deliberacao[] = [];
     const results: ConfirmResult[] = [];
 
-    for (const raw of deliberacoes) {
-      const d = sanitizeDelib(raw as ConfirmDelib);
-      const id = `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-      const nomesContra = new Set(d.nomes_votacao_contra);
-
-      // Unanimidade fallback: se não há nomes → todos os diretores da agência votam a favor
-      const votingNames =
-        d.nomes_votacao.length > 0
-          ? d.nomes_votacao
-          : diretoresList.map((dir) => dir.nome);
-
-      const votos: VotoEmbutido[] = votingNames.map((nome) => {
+    // Helper para criar votos
+    function buildVotos(nomes: string[], contra: Set<string>): VotoEmbutido[] {
+      const votingNames = nomes.length > 0 ? nomes : diretoresList.map((dir) => dir.nome);
+      return votingNames.map((nome) => {
         const match = findBestMatch(nome, diretoresList);
-        const isContra = nomesContra.has(nome);
+        const isContra = contra.has(nome);
         return {
           id: `local-v-${Math.random().toString(36).slice(2, 9)}`,
           diretor_id: match?.diretorId ?? nome,
@@ -129,17 +140,107 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           is_nominal: (match?.diretorId ?? null) !== null,
         };
       });
+    }
+
+    for (const raw of deliberacoes) {
+      const d = sanitizeDelib(raw as ConfirmDelib);
+      const nomesContra = new Set(d.nomes_votacao_contra);
+      const rawConfirm = raw as ConfirmDelib;
+
+      // ── Ata com items: expandir em N+1 deliberações ────────────────────
+      if (d.tipo_documento === "ata" && rawConfirm.ata_items && rawConfirm.ata_items.length > 0) {
+        const paiId = `local-ata-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+        // Criar ata-pai (registro envelope)
+        createdDelibs.push({
+          id: paiId,
+          agencia_id,
+          numero_deliberacao: d.numero_deliberacao,
+          numero_reuniao: d.numero_reuniao,
+          reuniao_ordinaria: d.reuniao_ordinaria,
+          tipo_reuniao: d.tipo_reuniao as "Ordinaria" | "Extraordinaria" | null,
+          tipo_documento: "ata",
+          data_reuniao: d.data_reuniao,
+          interessado: null,
+          assunto: `Ata da ${d.numero_reuniao ?? ""}ª Reunião - ${rawConfirm.ata_items.length} processos`,
+          procedencia: d.procedencia,
+          relator: null,
+          item_numero: null,
+          documento_pai_id: null,
+          processo: null,
+          resultado: null,
+          decisoes_todas: [],
+          microtema: null,
+          pauta_interna: false,
+          resumo_pleito: null,
+          fundamento_decisao: null,
+          auto_classified: true,
+          extraction_confidence: 1,
+          created_at: new Date().toISOString(),
+          votos: [],
+          raw_extraction: d.extraction_raw ?? null,
+        });
+
+        // Criar deliberação-filha para cada item
+        for (const item of rawConfirm.ata_items) {
+          const childId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+          createdDelibs.push({
+            id: childId,
+            agencia_id,
+            numero_deliberacao: d.numero_reuniao
+              ? `ATA-${d.numero_reuniao}-${item.item_numero}` : null,
+            numero_reuniao: d.numero_reuniao,
+            reuniao_ordinaria: d.reuniao_ordinaria,
+            tipo_reuniao: d.tipo_reuniao as "Ordinaria" | "Extraordinaria" | null,
+            tipo_documento: "ata",
+            data_reuniao: d.data_reuniao,
+            interessado: item.interessado,
+            assunto: item.assunto,
+            procedencia: null,
+            relator: item.relator,
+            item_numero: item.item_numero,
+            documento_pai_id: paiId,
+            processo: item.processo,
+            resultado: item.resultado as Resultado | null,
+            decisoes_todas: [],
+            microtema: item.microtema,
+            pauta_interna: false,
+            resumo_pleito: item.decisao?.slice(0, 2000) ?? null,
+            fundamento_decisao: null,
+            auto_classified: true,
+            extraction_confidence: item.processo ? 0.8 : 0.4,
+            created_at: new Date().toISOString(),
+            votos: buildVotos(d.nomes_votacao, nomesContra),
+            raw_extraction: null,
+          });
+        }
+
+        results.push({ filename: d.filename, status: "created", deliberacao_id: paiId });
+        continue;
+      }
+
+      // ── Deliberação individual ──────────────────────────────────────────
+      const id = `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const votos = buildVotos(d.nomes_votacao, nomesContra);
 
       createdDelibs.push({
         id,
         agencia_id,
         numero_deliberacao: d.numero_deliberacao,
+        numero_reuniao: d.numero_reuniao,
         reuniao_ordinaria: d.reuniao_ordinaria,
+        tipo_reuniao: d.tipo_reuniao as "Ordinaria" | "Extraordinaria" | null,
+        tipo_documento: (d.tipo_documento ?? "deliberacao") as "deliberacao" | "ata" | "resolucao" | "portaria",
         data_reuniao: d.data_reuniao,
         interessado: d.interessado,
         assunto: d.assunto,
+        procedencia: d.procedencia,
+        relator: d.relator ?? null,
+        item_numero: d.item_numero ?? null,
+        documento_pai_id: null,
         processo: d.processo,
         resultado: d.resultado as Resultado | null,
+        decisoes_todas: d.decisoes_todas,
         microtema: d.microtema,
         pauta_interna: d.pauta_interna,
         resumo_pleito: d.resumo_pleito,
@@ -203,12 +304,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           .from("deliberacoes")
           .insert({
             numero_deliberacao: d.numero_deliberacao,
+            numero_reuniao: d.numero_reuniao,
             reuniao_ordinaria: d.reuniao_ordinaria,
+            tipo_reuniao: d.tipo_reuniao,
+            tipo_documento: d.tipo_documento ?? "deliberacao",
             processo: d.processo,
             interessado: d.interessado,
             assunto: d.assunto,
+            procedencia: d.procedencia,
+            relator: d.relator,
+            item_numero: d.item_numero,
             microtema: d.microtema,
             resultado: d.resultado,
+            decisoes_todas: d.decisoes_todas.length > 0 ? d.decisoes_todas : null,
             pauta_interna: d.pauta_interna,
             data_reuniao: d.data_reuniao,
             agencia_id,

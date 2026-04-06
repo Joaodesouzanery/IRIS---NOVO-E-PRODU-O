@@ -36,6 +36,20 @@ function isoMonthAgo(months: number): string {
   return d.toISOString().slice(0, 7);
 }
 
+/**
+ * Exclui ata-parents das contagens para evitar double-counting.
+ * Ata-parents são registros com tipo_documento="ata" e SEM documento_pai_id
+ * (i.e., são o registro "envelope" da ata, não um item individual).
+ * Items de ata TÊM documento_pai_id preenchido e devem ser contados.
+ */
+function excludeAtaParents(delibs: Deliberacao[]): Deliberacao[] {
+  return delibs.filter((d) =>
+    // Mantém: deliberações normais, items de ata (têm documento_pai_id)
+    // Exclui: ata-parents (tipo_documento="ata" sem documento_pai_id)
+    d.tipo_documento !== "ata" || d.documento_pai_id != null
+  );
+}
+
 function allVotos(delibs: Deliberacao[]): Array<VotoEmbutido & { delib: Deliberacao }> {
   const result: Array<VotoEmbutido & { delib: Deliberacao }> = [];
   for (const d of delibs) {
@@ -67,7 +81,7 @@ export function extractDirectors(delibs: Deliberacao[]) {
 // ─── 1. computeOverview ──────────────────────────────────────────────────────
 
 export function computeOverview(delibs: Deliberacao[], agenciaId?: string | null) {
-  const rows = filterByAgencia(delibs, agenciaId);
+  const rows = excludeAtaParents(filterByAgencia(delibs, agenciaId));
   const total = rows.length;
   const deferidos = rows.filter((r) => r.resultado === "Deferido").length;
   const indeferidos = rows.filter((r) => r.resultado === "Indeferido").length;
@@ -109,7 +123,7 @@ export function computeOverview(delibs: Deliberacao[], agenciaId?: string | null
 // ─── 2. computeMicrotemas ────────────────────────────────────────────────────
 
 export function computeMicrotemas(delibs: Deliberacao[], agenciaId?: string | null) {
-  const rows = filterByAgencia(delibs, agenciaId);
+  const rows = excludeAtaParents(filterByAgencia(delibs, agenciaId));
   const stats = new Map<string, { total: number; deferido: number; indeferido: number }>();
   for (const d of rows) {
     const m = d.microtema ?? "outros";
@@ -134,7 +148,7 @@ export function computeMicrotemas(delibs: Deliberacao[], agenciaId?: string | nu
 // ─── 3. computeMicrotemasEvolution ───────────────────────────────────────────
 
 export function computeMicrotemasEvolution(delibs: Deliberacao[], agenciaId?: string | null) {
-  const rows = filterByAgencia(delibs, agenciaId);
+  const rows = excludeAtaParents(filterByAgencia(delibs, agenciaId));
   const groups = new Map<string, Map<string, number>>();
   for (const d of rows) {
     const period = (d.data_reuniao ?? "").slice(0, 7);
@@ -200,7 +214,7 @@ export function computeReunioesCalendar(delibs: Deliberacao[], agenciaId?: strin
 // ─── 6. computeReunioesStats ─────────────────────────────────────────────────
 
 export function computeReunioesStats(delibs: Deliberacao[], agenciaId?: string | null) {
-  const rows = filterByAgencia(delibs, agenciaId);
+  const rows = excludeAtaParents(filterByAgencia(delibs, agenciaId));
   const byMonth = new Map<string, { total: number; deferido: number; indeferido: number }>();
   for (const d of rows) {
     const period = (d.data_reuniao ?? "").slice(0, 7);

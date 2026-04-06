@@ -7,12 +7,20 @@
 
 // ─── IDs fixos ─────────────────────────────────────────────────────────────
 const A_ARTESP = "demo-agency-artesp";
+const A_ANM    = "demo-agency-anm";
 
 // Diretores ARTESP — nomes reais conforme deliberações 2026
 const DA1 = "demo-dir-artesp-1"; // André Isper Rodrigues Barnabé (Diretor-Presidente)
 const DA2 = "demo-dir-artesp-2"; // Diego Albert Zanatto (Diretor)
 const DA3 = "demo-dir-artesp-3"; // Fernanda Esbízaro Rodrigues Rudnik (Diretora)
 const DA4 = "demo-dir-artesp-4"; // Raquel França Carneiro (Diretora)
+
+// Diretores ANM — nomes reais conforme atas de reunião 2019
+const DN1 = "demo-dir-anm-1"; // Victor Hugo Froner Bicca (Diretor-Geral)
+const DN2 = "demo-dir-anm-2"; // Debora Toci Puccini (Diretora)
+const DN3 = "demo-dir-anm-3"; // Eduardo Araujo de Souza Leão (Diretor)
+const DN4 = "demo-dir-anm-4"; // Tasso Mendonça Júnior (Diretor)
+const DN5 = "demo-dir-anm-5"; // Tomás Antonio Albuquerque de Paula Pessoa Filho (Diretor)
 
 // ─── Mapeamento agência → diretores ──────────────────────────────────────
 const AGENCY_DIRS: Record<string, Array<{ id: string; nome: string }>> = {
@@ -21,6 +29,13 @@ const AGENCY_DIRS: Record<string, Array<{ id: string; nome: string }>> = {
     { id: DA2, nome: "Diego Albert Zanatto" },
     { id: DA3, nome: "Fernanda Esbízaro Rodrigues Rudnik" },
     { id: DA4, nome: "Raquel França Carneiro" },
+  ],
+  [A_ANM]: [
+    { id: DN1, nome: "Victor Hugo Froner Bicca" },
+    { id: DN2, nome: "Debora Toci Puccini" },
+    { id: DN3, nome: "Eduardo Araujo de Souza Leão" },
+    { id: DN4, nome: "Tasso Mendonça Júnior" },
+    { id: DN5, nome: "Tomás Antonio Albuquerque de Paula Pessoa Filho" },
   ],
 };
 
@@ -98,6 +113,9 @@ export const demoData = {
       { id: A_ARTESP, sigla: "ARTESP", nome: "Agência de Transporte do Estado de SP",
         nome_completo: "Agência Reguladora de Serviços Públicos Delegados de Transporte do Estado de São Paulo",
         ativo: true, created_at: "2020-01-10T10:00:00Z" },
+      { id: A_ANM, sigla: "ANM", nome: "Agência Nacional de Mineração",
+        nome_completo: "Agência Nacional de Mineração",
+        ativo: true, created_at: "2019-01-01T10:00:00Z" },
     ];
   },
 

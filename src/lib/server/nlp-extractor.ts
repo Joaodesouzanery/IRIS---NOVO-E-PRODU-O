@@ -5,12 +5,14 @@
  *   1. Regex globais cobrindo múltiplos rótulos e formatos
  *   2. Varredura linha a linha (extractLabeledFields) como segunda tentativa
  *
- * Suporta o padrão real das deliberações ARTESP e outras agências:
- *   - Verbos decisórios: RATIFICA, APROVA, RECOMENDA, DETERMINA, AUTORIZA, HOMOLOGA, etc.
- *   - Assinaturas de diretores em bloco ao final do documento
- *   - Campo "Assunto:" presente em todas as deliberações
+ * Suporta múltiplas agências:
+ *   - ARTESP: Deliberações com verbos decisórios (RATIFICA, APROVA, etc.)
+ *   - ANM: Atas de reunião com múltiplos items (split via ata-splitter.ts)
+ *   - Genérico: DEFERIDO/INDEFERIDO de outras agências
  * Mantém retrocompatibilidade com padrão DEFERIDO/INDEFERIDO de outras agências.
  */
+
+import { parseDataExtensoANM } from "./ata-splitter";
 
 // ─── Regex patterns ────────────────────────────────────────────────────────
 const RE_DELIBERACAO = /DELIBERA[ÇC][AÃ]O\s*N[ºo°]?\s*([\d\.]+)/gi;
@@ -23,6 +25,7 @@ const RE_PROCESSO = /(?:SEI[!]?\s*n[ºo°]?|Processo\s*(?:SEI\s*)?n[ºo°]?|PA\s
 const RE_INTERESSADO = /(?:Interessad[ao][:\s]+|Requerente[:\s]+|Empresa[:\s]+|Solicitante[:\s]+|Demandante[:\s]+|Concession[aá]ri[ao][:\s]+|Permission[aá]ri[ao][:\s]+|Peticion[aá]rio[:\s]+|Proponente[:\s]+|Benefici[aá]ri[ao][:\s]+|Outorgad[ao][:\s]+|Postulante[:\s]+|Requerida[:\s]+)([^\n]{3,200})/gi;
 
 const RE_ASSUNTO     = /Assunto[:\s]+([^\n]{3,300})/gi;
+const RE_PROCEDENCIA = /Proced[eê]ncia[:\s]+([^\n]{3,150})/gi;
 
 // Captura verbos de decisão reais das deliberações brasileiras.
 // Inclui verbos extras: HOMOLOGA, ARQUIVA, ANULA, REVOGA, CANCELA, PREJUDICA.
@@ -48,6 +51,10 @@ const RE_DATA_NUMERICA = /(\d{2})\/(\d{2})\/(\d{4})/g;
 // Data numérica próxima a contexto de reunião (mais confiável que a primeira data do documento)
 const RE_DATA_NUMERICA_CTX = /(?:Reuni[aã]o|realizada?\s+em|São\s+Paulo)\s*[,:]?\s*(\d{2})\/(\d{2})\/(\d{4})/gi;
 
+// Data específica do cabeçalho da deliberação — prioridade máxima
+// Ex: "DELIBERAÇÃO ARTESP Nº 66, DE 22 DE JANEIRO DE 2026"
+const RE_DATA_CABECALHO = /DELIBERA[ÇC][AÃ]O\s*(?:ARTESP\s*)?N[ºo°]?\s*[\d\.]+[,\s]+DE\s+(\d{1,2})\s+DE\s+(\w+)\s+DE\s+(\d{4})/i;
+
 // ─── Extração de nomes de diretores ───────────────────────────────────────
 // Padrões A/B/C: contexto de voto em frases narrativas
 const RE_VOTO_CONTEXTO = [
@@ -63,12 +70,25 @@ const RE_VOTO_DIRECAO =
 // Número ordinal da reunião — apenas o dígito "1176"
 const RE_NUMERO_REUNIAO = /(\d{3,4})[ªa°º]?\s*Reuni[aã]o/gi;
 
+// Tipo de reunião: Ordinária ou Extraordinária
+const RE_TIPO_REUNIAO = /\b(Ordin[aá]ria|Extraordin[aá]ria)\b/i;
+
 // Padrão D: bloco de assinatura em Title Case — "Nome Completo\nDiretor-Presidente"
 const RE_ASSINATURA = /^([A-ZÁÉÍÓÚÂÊÔÃÕÇÀÜ][a-záéíóúâêôãõçàü][a-záéíóúâêôãõçàü\s]+)\s*\n\s*(?:Diretor(?:-Presidente)?|Diretora(?:-Presidente)?|Conselheiro(?:-Presidente)?|Conselheira|Presidente)/gm;
 
 // Padrão E: bloco de assinatura ARTESP em CAIXA ALTA — "NOME COMPLETO\nDiretor-Presidente"
 // Necessário porque deliberações ARTESP usam nomes em maiúsculas no rodapé.
 const RE_ASSINATURA_CAPS = /^([A-ZÁÉÍÓÚÂÊÔÃÕÇÀÜ]{2}[A-ZÁÉÍÓÚÂÊÔÃÕÇÀÜ\s]+)\s*\n\s*(?:Diretor(?:-Presidente)?|Diretora(?:-Presidente)?|Conselheiro(?:-Presidente)?|Conselheira|Presidente)/gm;
+
+// Bloco de atestação eletrônica SEI — deve ser removido antes de extrair signatários
+// para evitar duplicação de nomes (o SEI repete os nomes dos diretores nesse bloco)
+const RE_BLOCO_SEI_ASSINATURA = /Documento assinado eletronicamente[\s\S]*?(?=A autenticidade|$)/g;
+
+// Padrão F: assinatura ANM com dash — "Nome - Diretor(a)" ou "Nome - Diretor-Geral"
+const RE_ASSINATURA_DASH = /^\s*([A-ZÁÉÍÓÚÂÊÔÃÕÇÀÜ][a-záéíóúâêôãõçàü\s]+)\s*[-–]\s*(?:Diretor[a]?(?:[- ]Geral)?(?:\s*Substitut[oa])?|Conselheiro[a]?(?:-Presidente)?|Presidente)/gm;
+
+// Número da reunião para atas ANM: "ATA 1ª REUNIÃO"
+const RE_NUMERO_ATA = /ATA\s+(\d+)[ªa°º]?\s*REUNI[AÃ]O/i;
 
 // ─── Utilitários ───────────────────────────────────────────────────────────
 function firstMatch(text: string, pattern: RegExp, group = 1): string | null {
@@ -112,6 +132,18 @@ function allMatches(text: string, pattern: RegExp, group = 1): string[] {
     results.push(match[group].trim());
   }
   return results;
+}
+
+/** Extrai data do cabeçalho "DELIBERAÇÃO Nº X, DE DD DE MÊS DE AAAA" */
+function parseDataCabecalho(text: string): string | null {
+  const match = RE_DATA_CABECALHO.exec(text);
+  if (!match) return null;
+  const day = parseInt(match[1], 10);
+  const mesNome = match[2].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const year = parseInt(match[3], 10);
+  const month = MESES[mesNome];
+  if (!month || day < 1 || day > 31 || year < 1990 || year > 2099) return null;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 function parseOneDateExtenso(match: RegExpExecArray): string | null {
@@ -163,6 +195,20 @@ function parseDataNumerica(text: string): string | null {
   return parseOneDateNumerica(match[1], match[2], match[3]);
 }
 
+// Prioridade para resultado principal quando há múltiplos verbos decisórios
+const RESULTADO_PRIORIDADE: Record<string, number> = {
+  "Aprovado com Ressalvas": 1,
+  "Aprovado": 2,
+  "Autorizado": 3,
+  "Recomendado": 4,
+  "Ratificado": 5,
+  "Determinado": 6,
+  "Deferido": 7,
+  "Indeferido": 8,
+  "Parcialmente Deferido": 9,
+  "Retirado de Pauta": 10,
+};
+
 function normalizeResultado(raw: string): string | null {
   const upper = raw.toUpperCase().replace(/\s+/g, " ").trim();
   // Verificar os padrões mais específicos primeiro para evitar falsos positivos
@@ -192,11 +238,14 @@ export interface ExtractedFields {
   numero_deliberacao: string | null;
   reuniao_ordinaria: string | null;
   numero_reuniao: string | null;    // apenas o número ordinal "1176"
+  tipo_reuniao: string | null;      // "Ordinaria" | "Extraordinaria"
   data_reuniao: string | null;      // ISO: "YYYY-MM-DD"
   interessado: string | null;
   processo: string | null;
   assunto: string | null;           // campo "Assunto:" das deliberações ARTESP
+  procedencia: string | null;       // campo "Procedência:" (departamento de origem)
   resultado: string | null;
+  decisoes_todas: string[];         // todos os verbos decisórios únicos normalizados
   pauta_interna: boolean;
   resumo_pleito: string | null;
   fundamento_decisao: string | null;
@@ -211,6 +260,7 @@ export interface ExtractedFields {
 export function extractFields(text: string): ExtractedFields {
   const numero_deliberacao = firstMatch(text, RE_DELIBERACAO);
   const reuniao_ordinaria  = firstMatch(text, RE_REUNIAO);
+  const procedencia        = firstMatch(text, RE_PROCEDENCIA);
 
   // Estágio 1: regex globais
   let interessado = firstMatch(text, RE_INTERESSADO);
@@ -239,26 +289,45 @@ export function extractFields(text: string): ExtractedFields {
     }
   }
 
-  // Data: tenta extenso primeiro ("12 de janeiro de 2026"), depois numérico
-  const data_reuniao = parseDataExtenso(text) ?? parseDataNumerica(text);
+  // Data: prioriza cabeçalho ARTESP, depois extenso ANM, depois extenso genérico, depois numérico
+  const data_reuniao =
+    parseDataCabecalho(text) ??
+    parseDataExtensoANM(text) ??
+    parseDataExtenso(text) ??
+    parseDataNumerica(text);
 
-  // Resultado: pega o verbo/estado mais frequente no documento
-  const resultadoRaw = allMatches(text, RE_RESULTADO);
-  let resultado: string | null = null;
-  if (resultadoRaw.length > 0) {
-    const freq = new Map<string, number>();
-    for (const r of resultadoRaw) {
-      const norm = normalizeResultado(r);
-      if (norm) freq.set(norm, (freq.get(norm) ?? 0) + 1);
-    }
-    if (freq.size > 0) {
-      resultado = [...freq.entries()].sort((a, b) => b[1] - a[1])[0][0];
-    }
+  // Tipo de reunião
+  const tipoMatch = RE_TIPO_REUNIAO.exec(text);
+  let tipo_reuniao: string | null = null;
+  if (tipoMatch) {
+    const raw = tipoMatch[1].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    tipo_reuniao = raw.startsWith("extraordin") ? "Extraordinaria" : "Ordinaria";
   }
+
+  // Resultado: coleta TODOS os verbos decisórios únicos normalizados
+  const resultadoRaw = allMatches(text, RE_RESULTADO);
+  const decisoesSet = new Set<string>();
+  for (const r of resultadoRaw) {
+    const norm = normalizeResultado(r);
+    if (norm) decisoesSet.add(norm);
+  }
+  const decisoes_todas = [...decisoesSet];
+
+  // Resultado principal: por prioridade (APROVA > AUTORIZA > RECOMENDA > ...)
+  let resultado: string | null = null;
+  if (decisoes_todas.length > 0) {
+    resultado = decisoes_todas.sort(
+      (a, b) => (RESULTADO_PRIORIDADE[a] ?? 99) - (RESULTADO_PRIORIDADE[b] ?? 99)
+    )[0];
+  }
+
   // Fallback: "unanimidade de votos" → aprovação implícita
   if (!resultado) {
     RE_UNANIMIDADE.lastIndex = 0;
-    if (RE_UNANIMIDADE.exec(text)) resultado = "Aprovado por Unanimidade";
+    if (RE_UNANIMIDADE.exec(text)) {
+      resultado = "Aprovado por Unanimidade";
+      decisoes_todas.push("Aprovado por Unanimidade");
+    }
   }
 
   // Pauta interna: keywords administrativas ou ausência de interessado externo
@@ -295,22 +364,38 @@ export function extractFields(text: string): ExtractedFields {
   const RE_FUNDAMENTO = /(?:Fundamento[:\s]+|Em face do exposto|Considerando\s+o\s+exposto|Diante\s+do\s+exposto|Pelo\s+exposto|Tendo\s+em\s+vista[^,\n]{0,30},\s*decide[:\s]+|DECIDE\s+A\s+DIRETORIA[:\s]+|A\s+DIRETORIA(?:\s+DA\s+\w+)?\s+DECIDE[:\s]+|DECIDE[:\s]+|Decide-se[:\s]+|RESOLVE[:\s]+)([\s\S]{20,800}?)(?:\n\n|\n[A-Z]{3}|$)/i;
   const fundamento_decisao = RE_FUNDAMENTO.exec(text)?.[1]?.trim() ?? null;
 
-  // Número da reunião (apenas o ordinal)
-  const numero_reuniao = firstMatch(text, RE_NUMERO_REUNIAO);
+  // Número da reunião: tenta formato deliberação (1176ª), depois ata (ATA 1ª)
+  const numero_reuniao = firstMatch(text, RE_NUMERO_REUNIAO) ?? firstMatch(text, RE_NUMERO_ATA);
 
-  // ─── Bloco de assinatura: coleta signatários (title-case + ALL-CAPS) ─────
+  // ─── Bloco de assinatura: coleta signatários ──────────────────────────────
+  // Suporta 3 formatos:
+  //   A) Title-case + newline: "Nome Completo\nDiretor" (ARTESP)
+  //   B) ALL-CAPS + newline: "NOME COMPLETO\nDiretor" (ARTESP)
+  //   C) Dash: "Nome Completo - Diretor" (ANM)
+  // Remove bloco de atestação eletrônica SEI para evitar duplicação de nomes
+  const textSemSEI = text.replace(RE_BLOCO_SEI_ASSINATURA, "");
+
   const signatarios: string[] = [];
 
+  // Padrão A: title-case + newline
   RE_ASSINATURA.lastIndex = 0;
   let sig: RegExpExecArray | null;
-  while ((sig = RE_ASSINATURA.exec(text)) !== null) {
+  while ((sig = RE_ASSINATURA.exec(textSemSEI)) !== null) {
     const nome = sig[1].trim();
+    if (nome.length > 4 && !signatarios.includes(nome)) signatarios.push(nome);
+  }
+
+  // Padrão F: dash (ANM) — "Nome - Diretor(a)"
+  RE_ASSINATURA_DASH.lastIndex = 0;
+  let sigDash: RegExpExecArray | null;
+  while ((sigDash = RE_ASSINATURA_DASH.exec(textSemSEI)) !== null) {
+    const nome = sigDash[1].trim();
     if (nome.length > 4 && !signatarios.includes(nome)) signatarios.push(nome);
   }
 
   RE_ASSINATURA_CAPS.lastIndex = 0;
   let sigCaps: RegExpExecArray | null;
-  while ((sigCaps = RE_ASSINATURA_CAPS.exec(text)) !== null) {
+  while ((sigCaps = RE_ASSINATURA_CAPS.exec(textSemSEI)) !== null) {
     const nome = sigCaps[1].trim();
     if (nome.length > 4 && !signatarios.includes(nome)) signatarios.push(nome);
   }
@@ -386,11 +471,14 @@ export function extractFields(text: string): ExtractedFields {
     numero_deliberacao,
     reuniao_ordinaria,
     numero_reuniao,
+    tipo_reuniao,
     data_reuniao,
     interessado,
     processo,
     assunto,
+    procedencia,
     resultado,
+    decisoes_todas,
     pauta_interna,
     resumo_pleito,
     fundamento_decisao,
@@ -407,14 +495,16 @@ export function extractFields(text: string): ExtractedFields {
 // Soma dos pesos = 1.0 quando todos os campos estão presentes.
 export function calcConfidence(fields: ExtractedFields): number {
   const weights: [boolean, number][] = [
-    [fields.numero_deliberacao !== null, 0.22], // campo identificador central
-    [fields.data_reuniao       !== null, 0.18], // data sempre presente em deliberações
-    [fields.resultado          !== null, 0.18], // decisão final
-    [fields.interessado        !== null, 0.14], // quem fez o requerimento
-    [fields.assunto            !== null, 0.12], // tema da deliberação
+    [fields.numero_deliberacao !== null, 0.20], // campo identificador central
+    [fields.data_reuniao       !== null, 0.16], // data sempre presente em deliberações
+    [fields.resultado          !== null, 0.16], // decisão final
+    [fields.interessado        !== null, 0.12], // quem fez o requerimento
+    [fields.assunto            !== null, 0.10], // tema da deliberação
     [fields.processo           !== null, 0.10], // número do processo SEI
     [fields.resumo_pleito      !== null, 0.04], // resumo do pleito
     [fields.fundamento_decisao !== null, 0.02], // fundamento jurídico
+    [fields.signatarios.length > 0,     0.06], // diretores no bloco de assinatura
+    [fields.reuniao_ordinaria !== null,  0.04], // reunião identificada
   ];
   return weights.reduce((sum, [present, weight]) => sum + (present ? weight : 0), 0);
 }

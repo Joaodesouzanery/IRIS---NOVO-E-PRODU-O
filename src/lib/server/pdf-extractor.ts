@@ -62,6 +62,25 @@ function removeRepeatedLines(text: string, minRepeat = 3): string {
   return lines.filter((line) => !repeated.has(line.trim())).join("\n");
 }
 
+// ─── Remoção de cabeçalhos/rodapés SEI ───────────────────────────────────
+// Deliberações ARTESP no formato SEI repetem timestamps, números SEI e URLs
+// em cada página. Esses textos poluem a extração de campos.
+function removeSeiHeadersFooters(text: string): string {
+  return text
+    // Linha de timestamp + número SEI: "23/01/2026, 09:14 SEI/GESP - 0095528423 - DOE: ..."
+    .replace(/\d{2}\/\d{2}\/\d{4},?\s*\d{2}:\d{2}\s+SEI\/GESP\s*-\s*\d+\s*-\s*DOE:[^\n]*/g, "")
+    // URLs do SEI no rodapé
+    .replace(/https?:\/\/sei\.sp\.gov\.br\/sei\/controlador\.php[^\n]*/g, "")
+    // Indicador de página "1/2", "2/2" isolado em linha
+    .replace(/^\s*\d+\/\d+\s*$/gm, "")
+    // Linha de verificação DOE
+    .replace(/Este documento pode ser verificado[^\n]*/g, "")
+    .replace(/em https?:\/\/www\.doe\.sp\.gov\.br\/autenticidade[^\n]*/g, "")
+    // Assinatura digital MP
+    .replace(/Documento assinado digitalmente conforme MP[^\n]*/g, "")
+    .replace(/que institui a Infraestrutura de Chaves P[úu]blicas[^\n]*/g, "");
+}
+
 // ─── Normalização de espaços ──────────────────────────────────────────────
 function normalizeWhitespace(text: string): string {
   return text
@@ -131,6 +150,7 @@ export async function extractPdfText(
 
   // Aplicar pipeline de limpeza
   let text = fixEncoding(rawText);
+  text = removeSeiHeadersFooters(text);
   text = normalizeWhitespace(text);
   text = removeRepeatedLines(text); // remove cabeçalhos/rodapés repetidos por página
 

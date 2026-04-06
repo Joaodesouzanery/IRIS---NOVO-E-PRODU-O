@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     // Importação dinâmica para evitar erro em build sem credenciais
     const { createSupabaseServerClient } = await import("@/lib/supabase/server");
     const { isPdfBuffer, sha256Hex } = await import("@/lib/server/pdf-extractor");
-    const { processPdf } = await import("@/lib/server/pipeline");
+    const { processQueue } = await import("@/lib/server/pipeline");
 
     const agenciaId = formData.get("agencia_id");
 
@@ -246,13 +246,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Dispara pipeline em background sem bloquear a resposta HTTP
+    // Dispara pipeline em background com concorrência limitada (max 3 simultâneos)
     if (jobsToProcess.length > 0) {
       waitUntil(
-        Promise.all(
-          jobsToProcess.map(({ jobId, agenciaId: aid }) =>
-            processPdf(jobId, aid)
-          )
+        processQueue(
+          jobsToProcess.map(({ jobId, agenciaId: aid }) => ({
+            jobId, agenciaId: aid,
+          })),
+          3, // concorrência máxima
         )
       );
     }

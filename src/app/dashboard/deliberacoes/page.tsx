@@ -13,8 +13,15 @@ import { DELIBERACOES_TABS } from "@/lib/module-tabs";
 import { getLocalDelibs, clearLocalDelibs } from "@/lib/local-store";
 
 const MICROTEMAS = [
+  // ARTESP
   "tarifa", "obras", "multa", "contrato", "reequilibrio",
-  "fiscalizacao", "seguranca", "ambiental", "desapropriacao", "usuario", "Outros",
+  "fiscalizacao", "seguranca", "ambiental", "desapropriacao",
+  "adimplencia", "pessoal", "usuario",
+  // ANM
+  "lavra", "pesquisa", "licenciamento", "servidao", "cfem",
+  "disponibilidade", "recursos",
+  // Genérico
+  "outros",
 ];
 
 const ANOS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);

@@ -21,9 +21,15 @@ const RESULTADOS = [
   "Recomendado", "Determinado", "Autorizado",
 ];
 const MICROTEMAS = [
+  // ARTESP
   "tarifa", "obras", "multa", "contrato", "reequilibrio",
   "fiscalizacao", "seguranca", "ambiental", "desapropriacao",
-  "adimplencia", "pessoal", "usuario", "outros",
+  "adimplencia", "pessoal", "usuario",
+  // ANM
+  "lavra", "pesquisa", "licenciamento", "servidao", "cfem",
+  "disponibilidade", "recursos",
+  // Genérico
+  "outros",
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

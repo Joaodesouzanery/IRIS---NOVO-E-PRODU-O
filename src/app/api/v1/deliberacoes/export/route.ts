@@ -21,6 +21,7 @@ const escape = (v: unknown) => {
 const HEADERS = [
   "Numero", "Reuniao", "Data", "Interessado", "Processo",
   "Microtema", "Resultado", "Pauta Interna", "Confiança IA", "Criado Em",
+  "Tipo Documento", "Relator", "Item", "Assunto",
 ];
 
 export async function GET(req: NextRequest) {
@@ -83,11 +84,15 @@ export async function GET(req: NextRequest) {
     `numero_deliberacao, reuniao_ordinaria, data_reuniao,
      interessado, processo, microtema, resultado,
      pauta_interna, extraction_confidence, created_at,
+     tipo_documento, relator, item_numero, assunto, documento_pai_id,
      agencias (sigla)`
   );
 
   const agenciaId = searchParams.get("agencia_id");
   if (agenciaId) query = query.eq("agencia_id", agenciaId);
+
+  // Excluir ata-parents por padrão
+  query = query.or("tipo_documento.neq.ata,documento_pai_id.not.is.null");
 
   const year = searchParams.get("year");
   if (year) {
@@ -120,6 +125,10 @@ export async function GET(req: NextRequest) {
       escape(r.pauta_interna ? "Sim" : "Não"),
       escape(r.extraction_confidence != null ? `${(r.extraction_confidence * 100).toFixed(0)}%` : ""),
       escape(r.created_at),
+      escape(r.tipo_documento),
+      escape(r.relator),
+      escape(r.item_numero),
+      escape(r.assunto),
     ].join(",")
   );
 

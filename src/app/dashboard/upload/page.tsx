@@ -187,6 +187,20 @@ function ReviewCard({
           <span className="badge badge-green text-xs">{item.agencia_sigla_detected}</span>
         )}
 
+        {/* Tipo de documento */}
+        {fields.tipo_documento && fields.tipo_documento !== "deliberacao" && (
+          <span className="badge bg-brand/15 text-brand text-xs uppercase">
+            {fields.tipo_documento}
+          </span>
+        )}
+
+        {/* Items de ata extraídos */}
+        {(item as any).ata_items?.length > 0 && (
+          <span className="badge bg-brand/15 text-brand text-xs">
+            {(item as any).ata_items.length} processos
+          </span>
+        )}
+
         {/* Badge de confiança */}
         <span className={cn("badge text-xs font-mono px-2 py-0.5", confidenceColor(conf))}>
           {fmt(conf)} · {confidenceLabel(conf)}
@@ -364,6 +378,36 @@ function ReviewCard({
               <div className="flex flex-wrap gap-1.5">
                 {fields.nomes_votacao.map((nome, i) => (
                   <span key={i} className="badge badge-gray text-xs">{nome}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Items de ata (ANM e similares) */}
+          {(item as any).ata_items?.length > 0 && (
+            <div className="pt-2 border-t border-border">
+              <p className="text-xs text-text-label font-mono uppercase tracking-wider mb-2">
+                Processos extraidos ({(item as any).ata_items.length})
+              </p>
+              <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                {((item as any).ata_items as Array<{
+                  item_numero: string; processo: string | null;
+                  assunto: string | null; interessado: string | null;
+                  relator: string | null; resultado: string | null;
+                  microtema: string;
+                }>).map((ai, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs p-1.5 rounded bg-surface-secondary">
+                    <span className="font-mono text-brand shrink-0 w-8">{ai.item_numero}</span>
+                    <div className="flex-1 min-w-0">
+                      {ai.processo && <span className="font-mono text-text-label">{ai.processo}</span>}
+                      {ai.assunto && <span className="block text-text-primary truncate">{ai.assunto}</span>}
+                      {ai.interessado && <span className="block text-text-label truncate">{ai.interessado}</span>}
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      {ai.resultado && <span className="badge badge-gray text-[10px]">{ai.resultado}</span>}
+                      <span className="badge badge-gray text-[10px]">{ai.microtema}</span>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
@@ -569,12 +613,19 @@ export default function UploadPage() {
       return {
         filename: item.filename,
         numero_deliberacao: fields.numero_deliberacao,
+        numero_reuniao: fields.numero_reuniao,
         reuniao_ordinaria: fields.reuniao_ordinaria,
+        tipo_reuniao: fields.tipo_reuniao,
+        tipo_documento: fields.tipo_documento ?? "deliberacao",
         data_reuniao: fields.data_reuniao,
         interessado: fields.interessado,
         assunto: fields.assunto,
+        procedencia: fields.procedencia,
+        relator: fields.relator ?? null,
+        item_numero: fields.item_numero ?? null,
         processo: fields.processo,
         resultado: fields.resultado,
+        decisoes_todas: fields.decisoes_todas ?? [],
         microtema: fields.microtema,
         pauta_interna: fields.pauta_interna,
         resumo_pleito: fields.resumo_pleito,
@@ -583,6 +634,8 @@ export default function UploadPage() {
         nomes_votacao_contra: fields.nomes_votacao_contra ?? [],
         extraction_confidence: item.confidence,
         extraction_raw: item.extraction_raw,
+        // Para atas: enviar items extraídos para split no backend
+        ...((item as any).ata_items ? { ata_items: (item as any).ata_items } : {}),
       };
     });
 

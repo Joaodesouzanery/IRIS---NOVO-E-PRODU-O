@@ -71,26 +71,89 @@ const MICROTEMA_KEYWORDS: Record<string, string[]> = {
   ],
 };
 
+// ─── Microtemas ANM (mineração) ───────────────────────────────────────────
+const MICROTEMA_KEYWORDS_ANM: Record<string, string[]> = {
+  lavra: [
+    "lavra", "concessão de lavra", "portaria de lavra", "requerimento de lavra",
+    "requerimento de concessão de lavra", "prorrogação de prazo do requerimento de lavra",
+    "caducidade de concessão de lavra", "caducidade da concessão",
+    "requerimento de lavra", "requerimento de concessão",
+  ],
+  pesquisa: [
+    "pesquisa", "alvará de pesquisa", "autorização de pesquisa",
+    "relatório de pesquisa", "relatório final de pesquisa",
+    "nulidade do alvará", "título autorizativo de pesquisa",
+    "requerimento de autorização de pesquisa",
+  ],
+  licenciamento: [
+    "registro de licença", "licenciamento", "guia de utilização",
+    "registro de licenciamento", "renovação do registro de licença",
+    "prorrogação de licenciamento", "prorrogação do registro de licença",
+  ],
+  servidao: [
+    "servidão", "área de servidão", "laudo de servidão",
+    "instituição de servidão", "servidão de solo",
+    "requerimento de área de servidão",
+  ],
+  multa: [
+    "multa", "auto de infração", "penalidade", "sanção",
+    "recurso às multas", "imposição da multa",
+  ],
+  cfem: [
+    "cfem", "compensação financeira", "royalties",
+    "taxa anual por hectare", "tah", "refis",
+  ],
+  disponibilidade: [
+    "disponibilidade de área", "disponibilidade", "caducidade",
+    "decaimento", "bloqueio de área", "bloqueio parcial",
+  ],
+  recursos: [
+    "recurso hierárquico", "recurso administrativo", "reconsideração",
+    "pedido de reconsideração", "recurso contra", "análise de recurso",
+  ],
+  ambiental: [
+    "ambiental", "unidade de conservação", "estação ecológica",
+    "licenciamento ambiental", "meio ambiente",
+  ],
+};
+
 // ─── Classificação de microtema ───────────────────────────────────────────
 export interface ClassificationResult {
   microtema: string;
   confidence: number;
 }
 
-export function classifyMicrotema(text: string): ClassificationResult {
+/**
+ * Classifica microtema do texto.
+ * @param text - texto do documento
+ * @param agenciaSigla - sigla da agência (opcional) para usar dicionário específico
+ */
+export function classifyMicrotema(text: string, agenciaSigla?: string | null): ClassificationResult {
   const textLower = text.toLowerCase();
-  const scores = new Map<string, number>();
 
-  for (const [tema, keywords] of Object.entries(MICROTEMA_KEYWORDS)) {
-    let score = 0;
-    for (const kw of keywords) {
-      if (textLower.includes(kw.toLowerCase())) {
-        // Frases mais específicas (mais palavras) valem mais — evita falso-positivo por palavras genéricas
-        const wordCount = kw.trim().split(/\s+/).length;
-        score += wordCount;
+  // Selecionar dicionário baseado na agência
+  const dictionaries: Record<string, string[]>[] = [MICROTEMA_KEYWORDS];
+  if (agenciaSigla?.toUpperCase() === "ANM") {
+    dictionaries.unshift(MICROTEMA_KEYWORDS_ANM); // ANM tem prioridade
+  } else {
+    dictionaries.push(MICROTEMA_KEYWORDS_ANM); // fallback
+  }
+
+  const scores = new Map<string, number>();
+  for (const dict of dictionaries) {
+    for (const [tema, keywords] of Object.entries(dict)) {
+      let score = 0;
+      for (const kw of keywords) {
+        if (textLower.includes(kw.toLowerCase())) {
+          // Frases mais específicas (mais palavras) valem mais — evita falso-positivo por palavras genéricas
+          const wordCount = kw.trim().split(/\s+/).length;
+          score += wordCount;
+        }
+      }
+      if (score > 0) {
+        scores.set(tema, (scores.get(tema) ?? 0) + score);
       }
     }
-    if (score > 0) scores.set(tema, score);
   }
 
   if (scores.size === 0) return { microtema: "outros", confidence: 0 };
@@ -118,9 +181,35 @@ const PAUTA_INTERNA_KEYWORDS = [
   "empregado/servidor",
 ];
 
-export function classifyPautaInterna(text: string): boolean {
+/**
+ * Classifica se a deliberação é pauta interna.
+ * @param text - texto completo do PDF
+ * @param interessado - interessado extraído (se disponível)
+ * @param agenciaSigla - sigla da agência (ex: "ARTESP") para detectar auto-referência
+ */
+export function classifyPautaInterna(
+  text: string,
+  interessado?: string | null,
+  agenciaSigla?: string | null,
+): boolean {
   const textLower = text.toLowerCase();
-  return PAUTA_INTERNA_KEYWORDS.some((kw) => textLower.includes(kw));
+
+  // Keywords explícitas de pauta interna
+  if (PAUTA_INTERNA_KEYWORDS.some((kw) => textLower.includes(kw))) return true;
+
+  // Sem interessado externo → pauta interna
+  if (!interessado) return true;
+
+  // Interessado é a própria agência (ex: "ARTESP" como interessado)
+  if (agenciaSigla) {
+    const interessadoUpper = interessado.toUpperCase();
+    const siglaUpper = agenciaSigla.toUpperCase();
+    if (interessadoUpper.includes(siglaUpper) || interessadoUpper.includes("AGÊNCIA REGULADORA")) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 // ─── Detecção de agência reguladora no texto do PDF ───────────────────────

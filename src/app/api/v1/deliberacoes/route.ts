@@ -15,6 +15,8 @@ const VALID_SORT_COLUMNS = new Set([
   "microtema",
   "resultado",
   "interessado",
+  "tipo_documento",
+  "relator",
   "created_at",
 ]);
 
@@ -67,6 +69,7 @@ export async function GET(req: NextRequest) {
       `id, numero_deliberacao, reuniao_ordinaria, data_reuniao,
        interessado, processo, microtema, resultado, pauta_interna,
        extraction_confidence, agencia_id, created_at,
+       tipo_documento, relator, item_numero, documento_pai_id, assunto,
        agencias (sigla, nome),
        votos (id, tipo_voto, is_divergente, diretor_id,
          diretores (nome))`,
@@ -84,6 +87,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "agencia_id inválido" }, { status: 400 });
     }
     query = query.eq("agencia_id", agenciaId);
+  }
+
+  // Filtro de tipo de documento (ata, deliberacao, etc.)
+  const tipoDoc = searchParams.get("tipo_documento");
+  if (tipoDoc) query = query.eq("tipo_documento", tipoDoc);
+
+  // Excluir ata-parents por padrão (evita double-counting)
+  const includeParents = searchParams.get("include_parents") === "1";
+  if (!includeParents) {
+    // Ata-parents: tipo_documento="ata" AND documento_pai_id IS NULL AND item_numero IS NULL
+    // Mantém items de ata (documento_pai_id preenchido) e deliberações normais
+    query = query.or("tipo_documento.neq.ata,documento_pai_id.not.is.null");
   }
 
   const year = searchParams.get("year");
