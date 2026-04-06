@@ -52,8 +52,8 @@ const config: Config = {
         label: ["0.6875rem", { lineHeight: "1rem", letterSpacing: "0.08em" }],
       },
       boxShadow: {
-        card:         "0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.6)",
-        "card-hover": "0 4px 12px rgba(0,0,0,0.5)",
+        card:         "0 1px 3px rgba(0,0,0,0.25), 0 1px 2px rgba(0,0,0,0.35)",
+        "card-hover": "0 4px 14px rgba(0,0,0,0.35)",
         orange:       "0 0 0 2px rgba(249,115,22,0.4)",
       },
       borderRadius: {
